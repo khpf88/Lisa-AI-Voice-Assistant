@@ -1,0 +1,31 @@
+.git
+.gitignore
+.dockerignore
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+*.log
+
+# Cache directories
+.cache/
+
+# Models - These are large and will be handled inside the Dockerfile if needed
+models/
+*.gguf
+*.safetensors
+*.onnx
+*.onnx.json
+*.bin
+
+# Temporary and build artifacts
+toremove/
+build/
+dist/
+
+# Audio/Video files
+*.wav
+*.webm

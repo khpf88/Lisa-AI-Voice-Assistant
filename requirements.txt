@@ -19,3 +19,4 @@ bitsandbytes
 psutil
 kittentts
 num2words
+kokoro-tts

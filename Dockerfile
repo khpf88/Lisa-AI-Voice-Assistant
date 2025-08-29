@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.12-slim
+FROM python:3.12
 
 # Install system dependencies, including build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,16 +22,13 @@ COPY requirements.txt .
 # Install any needed packages specified in requirements.txt
 # We install torch separately to ensure we get the CPU version
 RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# Isolate and verify the problematic package
-RUN pip install --no-cache-dir kokoro-tts
-RUN python -c "import kokoro; print('kokoro successfully imported')"
-
-# Install the rest of the requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Explicitly verify kokoro-tts installation
+RUN python -c "import kokoro; print('kokoro from requirements.txt successfully imported')"
+
 # Copy the content of the local src directory to the working directory
-COPY . .
+COPY . . 
 
 # Download nltk data
 RUN python -c "import nltk; nltk.download('punkt')"

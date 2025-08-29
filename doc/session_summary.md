@@ -21,3 +21,36 @@
 *   Both SparkTTS and F5-TTS offer advanced features and potentially higher naturalness than Kokoro or KittenTTS. However, their suitability for *extremely* constrained devices remains a significant question mark.
 *   **KittenTTS** (which was recently integrated) is specifically designed for constrained devices (under 25MB model size, CPU-optimized) and should be **thoroughly tested first** on the target hardware to evaluate its performance and voice quality.
 *   If KittenTTS does not meet expectations for naturalness *and* there's a willingness to potentially sacrifice some performance or increase device capabilities, then **SparkTTS could be explored as a next step**, with the understanding that its suitability for *extremely* constrained devices needs to be verified. F5-TTS is likely not a good fit for local, on-device use.
+
+## Session Update: Docker Build Debugging
+
+**Date:** August 29, 2025
+
+**Summary:** This session focused on debugging a series of `ModuleNotFoundError` issues that occurred when running the application inside a Docker container. The build process was completing successfully, but the application would crash at runtime.
+
+**Key Findings & Resolutions:**
+
+*   **`ModuleNotFoundError: No module named 'num2words'`:**
+    *   **Diagnosis:** The `num2words` package was used in the application code but was missing from the `requirements.txt` file. A formatting error also occurred when attempting to add it, causing an invalid requirement string (`kittentts"num2words"`).
+    *   **Resolution:** The `requirements.txt` file was corrected to include `num2words` on its own line.
+
+*   **`ModuleNotFoundError: No module named 'kokoro'`:**
+    *   **Diagnosis:** This was a more complex issue. Despite `kokoro-tts` being correctly listed in `requirements.txt` and the `pip install` command finishing without error during the Docker build, the module was not available at runtime. Further investigation using a verification step (`RUN python -c "import kokoro"`) proved that `pip` was silently failing to install the package correctly from within the `requirements.txt` context.
+    *   **Resolution:** The `Dockerfile` was restructured to isolate the problematic package. `kokoro-tts` was removed from `requirements.txt` and installed using a separate, dedicated `RUN pip install kokoro-tts` command. An explicit verification step was added immediately after this command to ensure the build would fail if the import was not successful, preventing runtime errors.
+
+## Session Update: Final Docker Diagnosis & Project State
+
+**Date:** August 29, 2025
+
+**Summary:** After multiple attempts to fix the `kokoro-tts` installation failure within the Docker environment (including using a full Python base image), it has been concluded that the `kokoro-tts` package is fundamentally incompatible with the `python:3.12` Docker environment. The package fails to install correctly in a way that `pip` can detect, leading to a `ModuleNotFoundError` at runtime.
+
+**Decision:**
+
+*   Per the project owner's request, `kokoro-tts` will remain the primary TTS engine in the codebase. No workaround to switch to a different default TTS (like `KittenTTS`) will be implemented.
+*   The project's `Dockerfile` will be left in a state that attempts to install `kokoro-tts`.
+*   **Result:** The Docker build for this project is currently **not functional** and will fail until a new version of `kokoro-tts` is released that resolves this installation issue.
+
+**Recommendation:**
+
+*   A note should be added to the project's main `README.md` to warn users that the current Docker configuration is not buildable.
+*   The local changes to `Dockerfile`, `requirements.txt`, and `doc/session_summary.md` should be pushed to the GitHub repository to record this final state.

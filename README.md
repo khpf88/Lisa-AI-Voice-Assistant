@@ -6,6 +6,14 @@ This document is the main playbook for the Lisa AI Voice Assistant project. It p
 
 Lisa is a web-based AI voice assistant that you can have natural conversations with. It uses a hybrid approach: **Speech-to-Text (STT) runs locally on your machine**, and the **Large Language Model (LLM) and Text-to-Speech (TTS) are also primarily local and CPU-optimized**, ensuring privacy and efficient operation on various hardware.
 
+## Important Note: Docker Build Status
+
+Please be aware that the current Docker configuration for this project is **not functional**. The Docker build will fail due to an unresolved installation issue with the `kokoro-tts` dependency within the Docker environment. This is a known limitation, and the project owner has decided to keep `kokoro-tts` as the primary TTS engine in the codebase.
+
+If you intend to run this project via Docker, you will need to either:
+*   Find a solution to the `kokoro-tts` installation problem in your Docker environment.
+*   Modify the `Dockerfile` and `main.py` to use an alternative TTS engine (e.g., `KittenTTS`) as the default.
+
 ## Features
 
 *   **Conversational AI:** Engage in natural voice conversations with Lisa, powered by a local, CPU-optimized Large Language Model.
