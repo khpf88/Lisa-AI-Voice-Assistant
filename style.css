@@ -1,0 +1,186 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #121212;
+    color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+    width: 90%;
+    max-width: 600px;
+}
+
+h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+#status {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    min-height: 1.5rem;
+}
+
+.input-container {
+    display: flex;
+    margin-bottom: 1rem;
+}
+
+#message-input {
+    flex-grow: 1;
+    padding: 0.8rem;
+    font-size: 1rem;
+    border: 1px solid #333;
+    border-radius: 5px 0 0 5px;
+    background-color: #1e1e1e;
+    color: #ffffff;
+}
+
+#message-input:disabled {
+    background-color: #333;
+    cursor: not-allowed;
+}
+
+#send-btn {
+    background-color: #1e88e5;
+    color: #ffffff;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 0 5px 5px 0;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#send-btn:hover {
+    background-color: #1565c0;
+}
+
+#send-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+#start-stop-btn {
+    background-color: #4caf50;
+    color: #ffffff;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#start-stop-btn:hover {
+    background-color: #388e3c;
+}
+
+#start-stop-btn.active {
+    background-color: #e53935;
+}
+
+#start-stop-btn.active:hover {
+    background-color: #c62828;
+}
+
+@media (max-width: 600px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+
+    p {
+        font-size: 1rem;
+    }
+
+    #start-stop-btn {
+        padding: 0.8rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+.button-container {
+    text-align: center;
+    margin-top: 1rem; /* Add some space above the button */
+}
+
+/* LLM Icons */
+.llm-icons {
+    margin-top: 20px;
+    font-size: 0.8em;
+    color: #888;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.llm-icon {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border: 1px solid #333; /* Changed from #ddd to #333 for dark theme */
+    border-radius: 5px;
+    background-color: #1e1e1e; /* Changed from #f9f9f9 to #1e1e1e for dark theme */
+    color: #ffffff; /* Ensure text is visible on dark background */
+}
+
+/* Waveform Visualizer */
+#waveform-visualizer {
+    width: 100px;
+    height: 30px;
+    margin: 10px auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    visibility: hidden; /* Hidden by default */
+}
+
+#waveform-visualizer .bar {
+    width: 8px;
+    height: 5px;
+    background-color: #4caf50; /* Default listening color */
+    border-radius: 2px;
+    transform: scaleY(1);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Listening animation */
+#waveform-visualizer.listening .bar {
+    animation: waveform-pulse-listening 1.2s infinite ease-in-out;
+}
+
+#waveform-visualizer.listening .bar:nth-child(1) { animation-delay: 0s; }
+#waveform-visualizer.listening .bar:nth-child(2) { animation-delay: 0.1s; }
+#waveform-visualizer.listening .bar:nth-child(3) { animation-delay: 0.2s; }
+#waveform-visualizer.listening .bar:nth-child(4) { animation-delay: 0.3s; }
+#waveform-visualizer.listening .bar:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes waveform-pulse-listening {
+    0%, 100% { transform: scaleY(1); background-color: #4caf50; }
+    50% { transform: scaleY(2.5); background-color: #8bc34a; }
+}
+
+/* Speaking animation */
+#waveform-visualizer.speaking .bar {
+    background-color: #1e88e5; /* Speaking color */
+    animation: waveform-pulse-speaking 0.6s infinite alternate ease-in-out;
+}
+
+#waveform-visualizer.speaking .bar:nth-child(1) { animation-delay: 0s; }
+#waveform-visualizer.speaking .bar:nth-child(2) { animation-delay: 0.05s; }
+#waveform-visualizer.speaking .bar:nth-child(3) { animation-delay: 0.1s; }
+#waveform-visualizer.speaking .bar:nth-child(4) { animation-delay: 0.15s; }
+#waveform-visualizer.speaking .bar:nth-child(5) { animation-delay: 0.2s; }
+
+@keyframes waveform-pulse-speaking {
+    0%, 100% { transform: scaleY(0.5); background-color: #1e88e5; }
+    50% { transform: scaleY(2); background-color: #42a5f5; }
+}

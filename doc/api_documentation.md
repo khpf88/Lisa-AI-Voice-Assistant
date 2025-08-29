@@ -1,0 +1,43 @@
+# API Documentation
+
+This document provides a detailed description of the API endpoints for the Lisa AI Voice Assistant.
+
+## Overview
+
+The primary interaction with Lisa is now exclusively through a WebSocket connection (`/ws`) for real-time, bidirectional audio and text streaming. All LLM and TTS operations are integrated directly into this WebSocket communication.
+
+## WebSocket Endpoint: `/ws`
+
+*   **Method:** `WebSocket`
+*   **Description:** Establishes a real-time, full-duplex connection for streaming audio from the client for Speech-to-Text (STT) and receiving streaming text responses from the LLM and streaming audio data from Text-to-Speech (TTS).
+
+### Incoming Messages (from Client to Server):
+
+*   **Sample Rate:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "samplerate", "data": <number>}`
+    *   **Description:** The first message sent by the client to inform the server of the client's audio sample rate.
+*   **Audio Data:**
+    *   **Type:** Binary data (bytes).
+    *   **Content:** Raw PCM audio segments from the user's microphone.
+    *   **Format:** Float32Array (raw PCM), at the sample rate specified in the initial `samplerate` message, mono channel.
+    *   **Purpose:** Used by the server for VAD and STT processing.
+
+### Outgoing Messages (from Server to Client):
+
+*   **`transcription`:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "transcription", "text": "string"}`
+    *   **Description:** The final, combined transcription of a user's complete utterance, sent after speech detection.
+*   **Audio Data:**
+    *   **Type:** Binary data (bytes).
+    *   **Content:** Opus-encoded audio segments of Lisa's synthesized voice response from the TTS engine. These are streamed as they become available from the LLM's streaming output.
+    *   **Format:** Opus compressed audio, 24kHz sample rate, 16-bit signed integers (mono channel).
+*   **`EOS`:**
+    *   **Type:** `Text`
+    *   **Content:** `"EOS"`
+    *   **Description:** Sent by the server to indicate the End-Of-Stream for a complete LLM-generated audio response. This signals the client that no more audio segments are expected for the current response.
+*   **`error`:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "error", "message": "string"}`
+    *   **Description:** An error message from the server.

@@ -1,0 +1,43 @@
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+*.log
+
+# Cache directories
+.cache/
+
+# Models
+models/
+*.gguf
+*.safetensors
+*.onnx
+*.onnx.json
+*.bin
+
+# Temporary and build artifacts
+toremove/
+build/
+dist/
+
+# Compiled files and libraries
+*.dll
+*.exe
+*.so
+*.a
+*.lib
+
+# Audio/Video files
+*.wav
+*.webm
+
+# IDE and build system files
+*.sln
+*.vcxproj*
+Makefile
+CMakeCache.txt

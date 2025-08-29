@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lisa AI Assistant</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Lisa</h1>
+        <div id="waveform-visualizer"></div>
+        <p id="status">Click anywhere to start</p>
+        <div class="button-container">
+            <button id="interruptButton" style="display: none;">Interrupt</button>
+        </div>
+        <div id="session-info" class="session-info">
+            <span id="specs-info">Loading system specs...</span>
+            <div id="model-info">
+                <span>STT: Loading...</span>
+                <span>LLM: Loading...</span>
+                <span>TTS: Loading...</span>
+            </div>
+            <span id="tokens-info">Session Tokens: 0</span>
+        </div>
+    </div>
+    <!-- ONNX Runtime Web -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.js"></script>
+    <!-- VAD.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad/dist/index.browser.js"></script>
+    <!-- FLAC.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aurora.js-flac/0.1.0/flac.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
