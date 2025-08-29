@@ -88,3 +88,24 @@
 *   [ ] **Deployment & Packaging:**
     *   [ ] Containerize the application (e.g., using Docker).
     *   [ ] Provide simplified deployment instructions.
+
+## Phase 7: Lisa-Riley Integration
+
+*   [ ] **Define Riley's API/Interface:**
+    *   [ ] Finalize data structures for communication between Lisa and Riley (input to Riley, output from Riley).
+*   [ ] **Implement Conditional Call to Riley in Lisa:**
+    *   [ ] Identify interception point in `main.py` after STT and before Lisa's LLM.
+    *   [ ] Implement "certain rules" logic to decide when to call Riley.
+    *   [ ] Implement client-side logic in Lisa to send data to Riley's API.
+*   [ ] **Develop Riley's Core Functionality:**
+    *   [ ] Set up Riley's project structure and basic FastAPI application.
+    *   [ ] Choose and integrate a database for memory storage (short-term, long-term).
+    *   [ ] Implement memory storage and retrieval mechanisms.
+    *   [ ] Implement intelligence/response generation logic within Riley.
+    *   [ ] Implement Riley's API endpoint to receive data from Lisa.
+*   [ ] **Integrate Riley's Response into Lisa's TTS:**
+    *   [ ] Modify Lisa's `main.py` to use Riley's generated response for TTS when Riley is consulted.
+*   [ ] **Testing and Validation:**
+    *   [ ] Develop unit tests for Lisa-Riley communication.
+    *   [ ] Develop end-to-end integration tests for memory-aware conversations.
+    *   [ ] Conduct performance testing for the integrated system.

@@ -1,83 +1,109 @@
-# Architecture Diagrams
+# Architecture Diagrams - Lisa AI Voice Assistant
 
-This document contains diagrams that visualize the current and future architecture of the Lisa application.
+This document contains diagrams that visualize the current and future architecture of the Lisa application within a broader AI ecosystem.
 
-## Current Architecture
+## Current Architecture (Lisa as a Voice I/O Service)
 
-This diagram shows the current setup of the application, now supporting real-time, two-way voice interaction with server-side Voice Activity Detection (VAD), streaming LLM responses, and focusing on a local, CPU-optimized LLM for continued operation on constrained machines. It uses a client-server model with WebSocket for efficient audio and text streaming, configured with `ws_ping_interval` and `ws_ping_timeout` for connection keep-alive. The client sends raw audio (float32, converted to int16 for server-side VAD), and the server streams back audio encoded as Opus within a WebM container.
-
-```mermaid
-graph TD
-    subgraph Browser
-        A[index.html] --> B(script.js);
-        B --> C{Microphone Input};
-        C -- "1. Raw Audio (AudioWorklet)" --> D[AudioWorklet Processor];
-        D -- "2. Raw Audio Chunks (WebSocket)" --> E;
-        B --> H[Audio Output];
-    end
-
-    subgraph Local Server (main.py)
-        E[FastAPI Server (WebSocket)] --> I[Accumulate Raw Audio];
-        I -- "3. VAD (webrtcvad)" --> J[Speech Segments];
-        J -- "4. Transcribe (Faster Whisper STT Engine)" --> K[LLM Orchestrator];
-        K -- "5. Prompt" --> L[Local LLM (e.g., LiquidAI LFM)];
-        L -- "6. Streaming Response" --> M[Sentence Tokenization];
-        M -- "7. TTS Raw Audio Chunks (TTS Engine)" --> N[Streaming Opus Encoder (FFmpeg)];
-        N -- "8. Streamable WebM/Opus Packets (WebSocket)" --> B;
-        N -- "9. EOS Signal (WebSocket)" --> B;
-    end
-```
-
-## Future Architecture (with Emotion Recognition and Enhanced Modularity)
-
-This diagram illustrates the long-term vision for Lisa, incorporating advanced features like emotion detection and empathetic responses, alongside a more modular and scalable LLM integration.
+In this refined architecture, Lisa's primary role is to act as a dedicated Voice Input/Output (I/O) Service. It handles the real-time, two-way voice interaction, including Speech-to-Text (STT) and Text-to-Speech (TTS), and can optionally perform its own LLM processing. It is designed to be consumed by a central Orchestration Service or other applications.
 
 ```mermaid
 graph TD
-    subgraph Browser
-        A[User's Voice] --> B(Microphone Input);
-        B -- "1. Speech Detected (VAD)" --> C[Client-side Audio Processing];
-        C -- "2. Encoded Audio Stream" --> D[WebSocket Connection];
-        D --> E[Audio Output];
+    subgraph Client (User Device)
+        A[Microphone Input] --> B(Audio Processing);
+        B -- "Raw Audio Chunks (WebSocket)" --> C[Lisa AI Voice I/O Service];
+        C -- "Streamable WebM/Opus Packets (WebSocket)" --> D[Audio Output];
     end
 
-    subgraph Local Server
-        subgraph AI Core
-            F[STT Engine] -- "3. Text" --> G[LLM Orchestrator];
-            H[Emotion Recognition (Optional)] -- "4. Emotion Data" --> G;
-            G -- "5. Contextualized Prompt" --> I[Multiple LLM Providers];
-            I -- "6. Streaming Response" --> J[TTS Engine];
-            J -- "7. Encoded Audio Stream" --> D;
+    subgraph Lisa AI Voice I/O Service (main.py)
+        C --> E[FastAPI Server (WebSocket)];
+        E --> F[STT Engine (Faster Whisper)];
+        F -- "Transcribed Text" --> G{LLM Orchestrator (Optional/Internal LLM)};
+        G -- "LLM Response" --> H[TTS Engine (Kokoro-TTS)];
+        H -- "Encoded Audio" --> E;
+
+        subgraph Dedicated API Endpoints (for Orchestrator/Other Services)
+            I[POST /stt (Audio In)] --> F;
+            G --> J[POST /tts (Text Out)];
         end
     end
 ```
 
+**Components:**
+
+*   **Client (User Device):** The user's interface for voice interaction, handling microphone input and audio playback.
+*   **Lisa AI Voice I/O Service:**
+    *   **FastAPI Server (WebSocket):** Manages real-time audio and text streaming with the client.
+    *   **STT Engine (Faster Whisper):** Transcribes incoming audio into text.
+    *   **LLM Orchestrator (Optional/Internal LLM):** Lisa can still perform its own LLM processing if not orchestrated externally. This is where conditional calls to external intelligence modules (like Riley) would originate.
+    *   **TTS Engine (Kokoro-TTS):** Converts text responses into natural-sounding speech.
+    *   **Dedicated API Endpoints:** Exposes STT and TTS functionalities as separate REST endpoints for consumption by an Orchestration Service or other applications.
+
+## Future Architecture (with Central Orchestration)
+
+This diagram illustrates the long-term vision for Lisa within a modular, scalable AI ecosystem, where a central Orchestration Service coordinates interactions between various specialized AI modules.
+
+```mermaid
+graph TD
+    subgraph User Interaction Layer
+        A[User Device] --> B(Orchestration Service);
+    end
+
+    subgraph Core AI Services
+        B -- "Audio Input" --> C[Lisa AI (STT/TTS Service)];
+        B -- "Text/Context" --> D[Riley AI (Intelligence/Memory Service)];
+        B -- "Text/Context" --> E[Other AI Modules (e.g., Knowledge Base, Persona)];
+        C -- "Transcribed Text" --> B;
+        D -- "Intelligent Response" --> B;
+        E -- "Processed Data" --> B;
+        B -- "Text for TTS" --> C;
+        C -- "Audio Output" --> B;
+    end
+
+    subgraph Data & Management
+        D --> F[Memory Databases];
+        B --> G[API Gateway/Load Balancer];
+        G --> B;
+    end
+```
+
+**Key Principles of Future Architecture:**
+
+*   **Central Orchestration:** A dedicated service manages the flow of information between the user and various AI modules, coordinating complex conversational turns.
+*   **Modular Services:** Each core AI function (Voice I/O, Intelligence/Memory, etc.) is a distinct, independently deployable service.
+*   **Scalability:** Services can be scaled horizontally based on demand.
+*   **Flexibility:** New AI modules can be easily integrated into the orchestration layer.
+*   **Independent Access:** Individual services (like Lisa's STT/TTS or Riley's memory) can be called directly by other applications if needed.
+
 ## Roadmap to a Reusable Agent
 
-This section outlines the high-level steps to evolve the Lisa application from a simple prototype into a robust, reusable, and scalable AI voice agent.
+This section outlines the high-level steps to evolve the Lisa application into a robust, reusable, and scalable AI voice agent within a modular ecosystem.
 
 ### Step 1: Prove the Core Functionality (Achieved & Refined)
 
-The immediate goal of getting the core application working, including real-time two-way voice interaction, server-side VAD, streaming LLM responses, and multi-LLM provider support, has been largely achieved. We have confirmed the server-side audio pipeline is fully functional, and the audio playback issues have been resolved. The current focus is on optimizing performance.
+The immediate goal of getting the core application working, including real-time two-way voice interaction, server-side VAD, streaming LLM responses, and multi-LLM provider support, has been largely achieved. The current focus is on optimizing performance and ensuring stability.
 
-### Step 2: Refine and Harden the Agent
+### Step 2: Refactor Lisa as a Dedicated Voice I/O Service
 
-Once the core functionality is proven, the next step is to make the agent more robust and flexible. This includes:
-*   **Refining the API:** Designing a clean and well-documented API that is easy for other applications to use.
-*   **Adding Comprehensive Error Handling:** Implementing comprehensive error handling across all components (client, server, LLM integrations, TTS) to make the agent more resilient and provide better user feedback.
-*   **Configuration Management:** Using configuration files to manage settings like model names, server ports, API keys, and LLM provider weights, making the agent easily adaptable.
-*   **Audio Playback Optimization:** Addressing remaining issues with audio playback quality, timing, and gaps.
+*   **Expose Dedicated API Endpoints:** Implement clear REST API endpoints within Lisa for its STT and TTS functionalities, allowing external services to consume them.
+*   **Internal LLM Management:** Refine how Lisa's internal LLM is used, especially when an Orchestration Service or Riley is providing the primary intelligence.
+*   **Robust Error Handling:** Implement comprehensive error handling for all voice I/O processes.
 
-### Step 3: Containerize the Agent with Docker
+### Step 3: Introduce the Orchestration Service
 
-This is the key step to making the agent "plug and play." We will:
-*   **Create a `Dockerfile`:** This file will contain all the instructions to package our Python server, AI models, and all dependencies into a single, self-contained Docker container.
-*   **Build a Docker Image:** This will create a portable image of our agent that can be run on any machine with Docker installed.
+*   **Design Orchestrator Logic:** Define how the Orchestration Service will route requests, manage conversational state, and coordinate calls to Lisa, Riley, and other modules.
+*   **Implement Core Routing:** Develop the initial logic for directing user input to the appropriate AI service.
+*   **Integrate with Lisa's New APIs:** Ensure the Orchestration Service can seamlessly call Lisa's dedicated STT and TTS endpoints.
 
-### Step 4: Deploy and Scale
+### Step 4: Integrate Riley AI (Intelligence & Memory Service)
 
-With the agent containerized, we can then focus on deployment and scalability:
-*   **Deployment:** The agent can be easily deployed to a local machine, a local server, or a cloud provider.
-*   **Scalability:** For high-demand applications, we can explore advanced topics like:
-    *   **Horizontal Scaling:** Running multiple instances of the agent behind a load balancer.
-    *   **Asynchronous Processing:** Using task queues to handle long-running model inference tasks without blocking the server.
+*   **Develop Riley's Core:** Build Riley as a separate service with its own API, focusing on NLU, memory management, and intelligent response generation.
+*   **Integrate with Orchestrator:** Enable the Orchestration Service to call Riley's APIs for intelligence and memory processing.
+
+### Step 5: Deploy and Scale
+
+With the modular services defined, focus on deployment and scalability:
+
+*   **Containerization:** Package each service (Lisa, Riley, Orchestrator) into its own Docker container.
+*   **Deployment Strategy:** Define how these containers will be deployed (e.g., Kubernetes, Docker Compose).
+*   **Horizontal Scaling:** Implement strategies for running multiple instances of each service behind load balancers.
+*   **Asynchronous Communication:** Explore message queues for inter-service communication to improve reliability and performance.
