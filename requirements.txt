@@ -7,13 +7,9 @@ soundfile
 numpy
 google-generativeai
 pydub
-kokoro-tts
 llama-cpp-python==0.2.20
 onnxruntime
 ffmpeg-python
-torch
-torchvision
-torchaudio
 transformers
 webrtcvad-wheels
 scipy
@@ -22,3 +18,4 @@ optimum[onnxruntime]
 bitsandbytes
 psutil
 kittentts
+num2words
