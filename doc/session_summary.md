@@ -69,3 +69,30 @@
 *   The `Dockerfile` for Lisa has been cleaned up to remove the problematic `kokoro` import verification step.
 
 **Result:** The Lisa project's Docker build is now functional, and the TTS functionality is provided by the external Kokoro FastAPI service, allowing for a robust and maintainable setup.
+
+## Session Update: Voice Selection and Stability Enhancements
+
+**Date:** September 6, 2025
+
+**Summary:** This session focused on enhancing voice selection capabilities for both Kitten TTS and Kokoro TTS, as well as addressing critical stability issues related to LLM conversation history and client-side audio playback.
+
+**Key Enhancements & Resolutions:**
+
+*   **Kitten TTS Voice Selection:**
+    *   Implemented functionality to allow users to select specific Kitten TTS voices (e.g., `expr-voice-4m`) via the `KITTEN_TTS_VOICE` environment variable in `.env`.
+    *   Corrected hardcoded voice selection in `main.py` to utilize the environment variable.
+
+*   **Kokoro TTS Voice Selection:**
+    *   Implemented functionality to allow users to select specific Kokoro TTS voices (e.g., `af_bella`) via the `KOKORO_TTS_VOICE` environment variable in `.env`.
+    *   Identified and corrected incorrect voice filenames (e.g., "Sky" vs. "af_sky") by consulting `VOICES.md` in the Kokoro TTS repository.
+    *   Corrected hardcoded voice selection in `main.py` to utilize the environment variable.
+
+*   **LLM Conversation History Management:**
+    *   Implemented a conversation history mechanism for the LLM in `main.py` to prevent the LLM from repeating previous responses.
+    *   The LLM now receives the full conversation context, leading to more coherent and non-repetitive interactions.
+
+*   **Client-Side Audio Playback Stability:**
+    *   Resolved the `QuotaExceededError` in `script.js` by ensuring proper cleanup and re-initialization of `MediaSource` and `SourceBuffer` objects in the `AudioPlayer` class.
+    *   Added explicit `audioPlayer.stop()` calls when new transcriptions are received to ensure a clean state for each new audio stream.
+
+**Result:** Lisa now offers enhanced voice customization for both Kitten and Kokoro TTS, and critical bugs related to LLM response repetition and audio playback stability have been resolved, leading to a more robust and user-friendly experience.

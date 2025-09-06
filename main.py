@@ -81,20 +81,29 @@ async def lifespan(app: fastapi.FastAPI):
     # --- LLM Initialization ---
     llm_model_name = os.getenv("LLM_MODEL_FILENAME", "tinyllama-1.1b-chat-v1.0.Q3_K_S.gguf")
     llm_model_path = os.path.join(ROOT, "models", llm_model_name)
-    print(f"Loading LLM from: {llm_model_path}")
-    app.state.llm = Llama(model_path=llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=True)
+    # print(f"Loading LLM from: {llm_model_path}")
+    app.state.llm = Llama(model_path=llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=False)
     app.state.model_info["llm"] = llm_model_name
-    print("LLM initialized.")
+    # print("LLM initialized.")
 
     tts_engine_choice = os.getenv("TTS_ENGINE", "kokoro").lower().strip()
     app.state.tts_engine = tts_engine_choice
     app.state.model_info["tts"] = tts_engine_choice.capitalize()
     print(f"Selected TTS backend: {tts_engine_choice}")
 
+    # Read Kitten TTS voice if engine is kitten
+    if app.state.tts_engine == "kitten":
+        kitten_tts_voice = os.getenv("KITTEN_TTS_VOICE", "expr-voice-2-f") # Default to expr-voice-2-f
+        app.state.kitten_tts_voice = kitten_tts_voice
+        print(f"Selected Kitten TTS voice: {kitten_tts_voice}")
+
     # --- TTS Engine Initialization ---
     if app.state.tts_engine == "kokoro":
         app.state.kokoro_tts = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
         print("Kokoro TTS engine initialized.")
+        kokoro_tts_voice = os.getenv("KOKORO_TTS_VOICE", "Bella") # Default to Bella
+        app.state.kokoro_tts_voice = kokoro_tts_voice
+        print(f"Selected Kokoro TTS voice: {kokoro_tts_voice}")
     elif app.state.tts_engine == "kitten":
         app.state.kittentts_model = KittenTTS()
         print("KittenTTS engine initialized.")
@@ -122,15 +131,22 @@ async def read_root():
     with open("index.html", "r") as f:
         return HTMLResponse(content=f.read())
 
-async def get_llm_response(app_state, text: str):
-    prompt = f"""<|user|>
+async def get_llm_response(app_state, text: str, history: list):
+    full_prompt = ""
+    for user_msg, assistant_resp in history:
+        full_prompt += f'''<|user|>
+{user_msg}<|end|>
+<|assistant|>
+{assistant_resp}<|end|>
+'''
+    full_prompt += f'''<|user|>
 {text}<|end|>
-<|assistant|>"""
-    
+<|assistant|>'''
+
     # Run the LLM inference in a background thread
     llm_stream = await run_in_threadpool(
         app_state.llm,
-        prompt=prompt,
+        prompt=full_prompt,
         max_tokens=150,
         temperature=0.7,
         top_p=0.95,
@@ -175,7 +191,7 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 tts_engine_choice = websocket.app.state.tts_engine
                 if tts_engine_choice == "kokoro":
                     all_generated_audio_chunks = []
-                    for i, (gs, ps, audio) in enumerate(websocket.app.state.kokoro_tts(sentence_text, voice="af_heart")):
+                    for i, (gs, ps, audio) in enumerate(websocket.app.state.kokoro_tts(sentence_text, voice=websocket.app.state.kokoro_tts_voice)):
                         if audio is not None and audio.numel() > 0:
                             all_generated_audio_chunks.append(audio)
                     if all_generated_audio_chunks:
@@ -190,7 +206,7 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 
                 elif tts_engine_choice == "kitten":
                     kittentts_model = websocket.app.state.kittentts_model
-                    audio_np = kittentts_model.generate(sentence_text, voice='expr-voice-2-f')
+                    audio_np = kittentts_model.generate(sentence_text, voice=websocket.app.state.kitten_tts_voice)
                     scaled_audio_np = (audio_np * 32767.0).astype(np.int16)
                     all_pcm_audio.extend(scaled_audio_np.tobytes())
                 print(f"Synthesized audio size: {len(all_pcm_audio)} bytes")
@@ -275,6 +291,8 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("WebSocket connected.")
 
+    conversation_history = [] # Initialize conversation history
+
     await websocket.send_json({
         "type": "session_info",
         "data": {
@@ -313,6 +331,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         if not is_speaking:
                             print("Speech started.")
                             is_speaking = True
+                            speech_buffer = bytearray() # Clear buffer at the start of a new speech segment
                         speech_buffer.extend(frame_bytes)
                         silence_frames_count = 0
                     elif is_speaking:
@@ -322,7 +341,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             is_speaking = False
                             if speech_buffer:
                                 speech_np_int16 = np.frombuffer(speech_buffer, dtype=np.int16)
-                                speech_buffer = bytearray()
+                                speech_buffer = bytearray() # Clear buffer after processing
                                 rms_energy = np.sqrt(np.mean(speech_np_int16.astype(np.float64)**2))
                                 ENERGY_THRESHOLD = 999
                                 print(f"Utterance RMS energy: {rms_energy:.2f}")
@@ -342,7 +361,8 @@ async def websocket_endpoint(websocket: WebSocket):
                                     if transcription and not transcription.lower().startswith(("[blank audio]", "[blank_audio]")):
                                         print(f"Final Transcription: '{transcription}'")
                                         await websocket.send_json({"type": "transcription", "text": transcription})
-                                        response_text = await get_llm_response(websocket.app.state, transcription)
+                                        response_text = await get_llm_response(websocket.app.state, transcription, conversation_history)
+                                        conversation_history.append((transcription, response_text))
                                         asyncio.create_task(stream_tts_and_synthesize(websocket, response_text))
                                     else:
                                         print("Transcription was blank or discarded.")

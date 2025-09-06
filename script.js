@@ -120,8 +120,16 @@ class AudioPlayer {
                 }
             }
             this.sourceBuffer.removeEventListener('updateend', this._onUpdateEnd);
+            // Detach sourceBuffer from mediaSource
+            if (this.mediaSource && this.mediaSource.readyState === 'open') {
+                try {
+                    this.mediaSource.removeSourceBuffer(this.sourceBuffer);
+                } catch (e) {
+                    console.error("Error removing SourceBuffer:", e);
+                }
+            }
         }
-        
+
         if (this.mediaSource) {
             if (this.mediaSource.readyState === 'open') {
                 try {
@@ -136,12 +144,15 @@ class AudioPlayer {
         this.audio.removeEventListener('ended', this._onAudioEnded);
         this.audio.removeEventListener('error', this._onAudioError);
         this.audio.pause();
-        this.audio.removeAttribute('src');
-        this.audio.load();
+        this.audio.removeAttribute('src'); // Detach MediaSource from audio element
+        this.audio.load(); // Reset audio element
 
         this.sourceBuffer = null;
         this.mediaSource = null;
-        
+
+        // Re-setup MediaSource for the next stream
+        this._setupMediaSource(); // <--- Add this line
+
         this.updateUIForListening();
     }
 
@@ -228,6 +239,7 @@ async function setupRealtimeCommunication() {
                     console.log("Transcription received:", message.text);
                     if(statusP) statusP.textContent = 'Lisa is thinking...';
                     if (audioPlayer) {
+                        audioPlayer.stop(); // <--- Add this line to ensure clean state
                         audioPlayer.queue = [];
                         audioPlayer.isStreamEnding = false;
                         audioPlayer.initialBuffer = [];

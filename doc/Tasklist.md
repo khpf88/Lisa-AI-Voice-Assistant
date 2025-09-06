@@ -74,6 +74,13 @@
         *   [x] Implement TTS engine selection (`Kokoro`, `KittenTTS`) via an environment variable (`TTS_ENGINE`).
         *   [x] Refactor the TTS integration to support this selection.
 
+## Phase 5.5: Recent Bug Fixes and Enhancements
+
+*   [x] **Implement Kitten TTS Voice Selection:** Allow users to select specific voices for Kitten TTS via environment variables.
+*   [x] **Implement Kokoro TTS Voice Selection:** Allow users to select specific voices for Kokoro TTS via environment variables.
+*   [x] **Fix LLM Conversation History:** Implement conversation history management to prevent the LLM from repeating previous responses.
+*   [x] **Fix Audio Player Quota Exceeded Error:** Resolve the `QuotaExceededError` in the client-side audio player by ensuring proper cleanup and re-initialization of MediaSource and SourceBuffer objects.
+
 ## Phase 6: Future Enhancements (Planned)
 
 *   [ ] **Evaluate and Integrate New TTS Options:**
