@@ -6,7 +6,7 @@
 *   [x] Implement modern, minimalist, and responsive web UI.
 *   [x] Set up FastAPI backend for web server and WebSocket communication.
 *   [x] Integrate Google Gemini API for Large Language Model (LLM) responses.
-*   [x] Integrate Kokoro-TTS for Text-to-Speech (TTS).
+*   [x] Integrate Text-to-Speech (TTS) via external Kokoro FastAPI service.
 *   [x] Integrate **Faster Whisper** for local, CPU-optimized Speech-to-Text (STT).
 *   [x] Implement interruption functionality via an on-screen button.
 
@@ -28,7 +28,7 @@
 
 ## Phase 2.5: Debugging & Refinement (Completed)
 *   [x] Resolve `IndentationError` and `SyntaxError` issues in `main.py`.
-*   [x] Implement correct `KPipeline` usage for Kokoro TTS, including `torch.Tensor` conversion and multi-chunk audio collection.
+
 *   [x] Lower Whisper `LOGPROB_THRESHOLD` to improve transcription confidence.
 *   [x] Temporarily remove FFmpeg stderr filtering for detailed debugging.
 *   [x] Confirm server-side audio pipeline functionality (TTS, FFmpeg, WebSocket send).
@@ -56,7 +56,7 @@
 *   [x] **Text-to-Speech (TTS):**
     *   [x] **Aggressive Sentence Splitting:** Implemented logic to start TTS synthesis on smaller text chunks (e.g., after commas) to reduce time-to-first-sound.
     *   [x] **Client-Side Buffering:** Increased the client-side audio buffer to mitigate choppiness caused by aggressive splitting.
-    *   [x] **Implement RealtimeTTS:** (Attempted, but permanently removed due to incompatibility and to avoid future confusion. A search for an even smaller footprint TTS is underway.)
+    *   [x] **Implement RealtimeTTS:** (Now handled by external Kokoro FastAPI service. Further evaluation of smaller footprint TTS options is ongoing for alternative backends.)
 
 ## Phase 5: Scalability and Flexibility (Completed)
 
@@ -85,8 +85,8 @@
     *   [ ] Evaluate different STT and local LLM models for better performance/accuracy trade-offs.
 *   [ ] **Voice Cloning:**
     *   [ ] Research and implement voice cloning capabilities for personalization, particularly for the elderly care companion app use case.
-*   [ ] **Deployment & Packaging:**
-    *   [ ] Containerize the application (e.g., using Docker).
+*   [x] **Deployment & Packaging:**
+    *   [x] Containerize the application (e.g., using Docker) - now functional via Docker Compose.
     *   [ ] Provide simplified deployment instructions.
 
 ## Phase 7: Lisa-Riley Integration

@@ -51,8 +51,8 @@ This document outlines the product requirements for "Lisa," a web-based AI Voice
 *   **Backend:** Python with FastAPI and WebSockets.
 *   **VAD Engine:** A server-side library like `webrtcvad`.
 *   **STT Engine:** **Faster Whisper** for local, CPU-optimized Speech-to-Text.
-*   **TTS Engine:** `kokoro-tts` or `kittentts` (capable of in-memory, streaming TTS).
-*   **Language Model:** Currently focused on local, CPU-optimized LLMs (e.g., TinyLlama or LiquidAI/lfm2 via `llama.cpp`).
+*   **TTS Engine:** `Kokoro FastAPI Wrapper` (external service) or `kittentts` (capable of in-memory, streaming TTS).
+*   **Language Model:** Currently focused on local, CPU-optimized GGUF models run via `llama.cpp`. The specific model is configured in the `.env` file using the `LLM_MODEL_FILENAME` variable, allowing for easy swapping of models like TinyLlama, Gemma, and Phi-3.
 
 ### 3.3. Architecture
 

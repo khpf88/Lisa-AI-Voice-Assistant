@@ -4,7 +4,7 @@ This document contains diagrams that visualize the current and future architectu
 
 ## Current Architecture (Lisa as a Voice I/O Service)
 
-In this refined architecture, Lisa's primary role is to act as a dedicated Voice Input/Output (I/O) Service. It handles the real-time, two-way voice interaction, including Speech-to-Text (STT) and Text-to-Speech (TTS), and can optionally perform its own LLM processing. It is designed to be consumed by a central Orchestration Service or other applications.
+In this refined architecture, Lisa's primary role is to act as a dedicated Voice Input/Output (I/O) Service. It handles the real-time, two-way voice interaction, including Speech-to-Text (STT) and Text-to-Speech (TTS). Lisa now communicates with a central Orchestration Service (Mickey) for intelligent responses.
 
 ```mermaid
 graph TD
@@ -17,14 +17,17 @@ graph TD
     subgraph Lisa AI Voice I/O Service (main.py)
         C --> E[FastAPI Server (WebSocket)];
         E --> F[STT Engine (Faster Whisper)];
-        F -- "Transcribed Text" --> G{LLM Orchestrator (Optional/Internal LLM)};
-        G -- "LLM Response" --> H[TTS Engine (Kokoro-TTS)];
-        H -- "Encoded Audio" --> E;
+        F -- "Transcribed Text" --> G[Mickey Orchestration Service];
+        G -- "Text for TTS" --> E;
 
         subgraph Dedicated API Endpoints (for Orchestrator/Other Services)
             I[POST /stt (Audio In)] --> F;
-            G --> J[POST /tts (Text Out)];
+            E --> J[POST /tts (Text Out)];
         end
+    end
+
+    subgraph External Services
+        G[Mickey Orchestration Service]
     end
 ```
 
@@ -34,8 +37,8 @@ graph TD
 *   **Lisa AI Voice I/O Service:**
     *   **FastAPI Server (WebSocket):** Manages real-time audio and text streaming with the client.
     *   **STT Engine (Faster Whisper):** Transcribes incoming audio into text.
-    *   **LLM Orchestrator (Optional/Internal LLM):** Lisa can still perform its own LLM processing if not orchestrated externally. This is where conditional calls to external intelligence modules (like Riley) would originate.
-    *   **TTS Engine (Kokoro-TTS):** Converts text responses into natural-sounding speech.
+    *   **Mickey Orchestration Service:** Lisa sends transcribed text to Mickey and receives text for TTS from Mickey.
+    *   **TTS Engine:** Converts text responses into natural-sounding speech.
     *   **Dedicated API Endpoints:** Exposes STT and TTS functionalities as separate REST endpoints for consumption by an Orchestration Service or other applications.
 
 ## Future Architecture (with Central Orchestration)
@@ -45,7 +48,7 @@ This diagram illustrates the long-term vision for Lisa within a modular, scalabl
 ```mermaid
 graph TD
     subgraph User Interaction Layer
-        A[User Device] --> B(Orchestration Service);
+        A[User Device] --> B(Mickey Orchestration Service);
     end
 
     subgraph Core AI Services
@@ -80,7 +83,7 @@ This section outlines the high-level steps to evolve the Lisa application into a
 
 ### Step 1: Prove the Core Functionality (Achieved & Refined)
 
-The immediate goal of getting the core application working, including real-time two-way voice interaction, server-side VAD, streaming LLM responses, and multi-LLM provider support, has been largely achieved. The current focus is on optimizing performance and ensuring stability.
+The immediate goal of getting the core application working, including real-time two-way voice interaction, server-side VAD, streaming LLM responses, and multi-LLM provider support, has been largely achieved. The application is now containerized using Docker Compose, and the TTS functionality is provided by an external Dockerized service. The current focus is on optimizing performance and ensuring stability.
 
 ### Step 2: Refactor Lisa as a Dedicated Voice I/O Service
 
@@ -103,7 +106,7 @@ The immediate goal of getting the core application working, including real-time 
 
 With the modular services defined, focus on deployment and scalability:
 
-*   **Containerization:** Package each service (Lisa, Riley, Orchestrator) into its own Docker container.
+*   **Containerization:** Lisa is already containerized and deployed via Docker Compose. Focus shifts to packaging Riley and Orchestrator into their own Docker containers.
 *   **Deployment Strategy:** Define how these containers will be deployed (e.g., Kubernetes, Docker Compose).
 *   **Horizontal Scaling:** Implement strategies for running multiple instances of each service behind load balancers.
 *   **Asynchronous Communication:** Explore message queues for inter-service communication to improve reliability and performance.

@@ -193,7 +193,7 @@ async function setupRealtimeCommunication() {
     const audioWorkletNode = new AudioWorkletNode(audioContext, 'audio-processor');
     
     // 3. Setup WebSocket
-    const WS_URL = 'ws://127.0.0.1:8000/ws';
+    const WS_URL = 'ws://127.0.0.1:8002/ws';
     ws = new WebSocket(WS_URL);
     ws.binaryType = 'arraybuffer';
 
@@ -228,7 +228,6 @@ async function setupRealtimeCommunication() {
                     console.log("Transcription received:", message.text);
                     if(statusP) statusP.textContent = 'Lisa is thinking...';
                     if (audioPlayer) {
-                        audioPlayer._setupMediaSource();
                         audioPlayer.queue = [];
                         audioPlayer.isStreamEnding = false;
                         audioPlayer.initialBuffer = [];

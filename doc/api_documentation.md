@@ -4,12 +4,12 @@ This document provides a detailed description of the API endpoints for the Lisa 
 
 ## Overview
 
-The primary interaction with Lisa is now exclusively through a WebSocket connection (`/ws`) for real-time, bidirectional audio and text streaming. All LLM and TTS operations are integrated directly into this WebSocket communication.
+The primary interaction with Lisa is now exclusively through a WebSocket connection (`/ws`) for real-time, bidirectional audio and text streaming. Lisa handles Speech-to-Text (STT) and Text-to-Speech (TTS) operations. For intelligent responses, Lisa communicates with the central Orchestration Service (Mickey), which in turn interacts with the Intelligence & Memory Module (Riley).
 
 ## WebSocket Endpoint: `/ws`
 
 *   **Method:** `WebSocket`
-*   **Description:** Establishes a real-time, full-duplex connection for streaming audio from the client for Speech-to-Text (STT) and receiving streaming text responses from the LLM and streaming audio data from Text-to-Speech (TTS).
+*   **Description:** Establishes a real-time, full-duplex connection for streaming audio from the client for Speech-to-Text (STT) and receiving streaming audio data from Text-to-Speech (TTS). After STT, the transcribed text is sent to the Orchestration Service (Mickey) for processing, and the intelligent response from Mickey is then synthesized into audio by Lisa's TTS engine.
 
 ### Incoming Messages (from Client to Server):
 
@@ -31,12 +31,12 @@ The primary interaction with Lisa is now exclusively through a WebSocket connect
     *   **Description:** The final, combined transcription of a user's complete utterance, sent after speech detection.
 *   **Audio Data:**
     *   **Type:** Binary data (bytes).
-    *   **Content:** Opus-encoded audio segments of Lisa's synthesized voice response from the TTS engine. These are streamed as they become available from the LLM's streaming output.
+    *   **Content:** Opus-encoded audio segments of Lisa's synthesized voice response from the TTS engine. These are streamed as they become available.
     *   **Format:** Opus compressed audio, 24kHz sample rate, 16-bit signed integers (mono channel).
 *   **`EOS`:**
     *   **Type:** `Text`
     *   **Content:** `"EOS"`
-    *   **Description:** Sent by the server to indicate the End-Of-Stream for a complete LLM-generated audio response. This signals the client that no more audio segments are expected for the current response.
+    *   **Description:** Sent by the server to indicate the End-Of-Stream for a complete audio response. This signals the client that no more audio segments are expected for the current response.
 *   **`error`:**
     *   **Type:** `JSON`
     *   **Content:** `{"type": "error", "message": "string"}`

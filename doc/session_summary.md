@@ -54,3 +54,18 @@
 
 *   A note should be added to the project's main `README.md` to warn users that the current Docker configuration is not buildable.
 *   The local changes to `Dockerfile`, `requirements.txt`, and `doc/session_summary.md` should be pushed to the GitHub repository to record this final state.
+
+## Session Update: Resolution of Kokoro TTS Docker Issue
+
+**Date:** August 29, 2025
+
+**Summary:** The persistent `kokoro-tts` installation issues within the Docker environment have been resolved by adopting an external, pre-built Dockerized solution for Kokoro TTS. Instead of installing `kokoro-tts` directly within Lisa's container, Lisa now communicates with a separate `Kokoro FastAPI Wrapper` service running in its own Docker container.
+
+**Resolution:**
+
+*   The `kokoro-tts` dependency has been removed from Lisa's `requirements.txt`.
+*   Lisa's `main.py` has been modified to make HTTP API calls to the `Kokoro FastAPI Wrapper` service for TTS synthesis.
+*   A `docker-compose.yml` file has been introduced to orchestrate both Lisa's container and the `Kokoro FastAPI Wrapper` container.
+*   The `Dockerfile` for Lisa has been cleaned up to remove the problematic `kokoro` import verification step.
+
+**Result:** The Lisa project's Docker build is now functional, and the TTS functionality is provided by the external Kokoro FastAPI service, allowing for a robust and maintainable setup.
