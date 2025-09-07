@@ -80,6 +80,7 @@
 *   [x] **Implement Kokoro TTS Voice Selection:** Allow users to select specific voices for Kokoro TTS via environment variables.
 *   [x] **Fix LLM Conversation History:** Implement conversation history management to prevent the LLM from repeating previous responses.
 *   [x] **Fix Audio Player Quota Exceeded Error:** Resolve the `QuotaExceededError` in the client-side audio player by ensuring proper cleanup and re-initialization of MediaSource and SourceBuffer objects.
+*   [x] **Filter LLM Prompt Tags from TTS Output:** Remove unwanted LLM prompt tags (e.g., `<|user|>`, `<|end|>`) from the text sent to the TTS engine to ensure clean speech responses.
 
 ## Phase 6: Future Enhancements (Planned)
 

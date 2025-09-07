@@ -226,7 +226,8 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                         continue
                     sentence_with_decimals = sentence.replace('<DECIMAL>', '.')
                     normalized_sentence = normalize_text(sentence_with_decimals)
-                    processed_sentence = re.sub(r'[\*#`_]', '', normalized_sentence).lstrip()
+                    # Remove LLM prompt tags
+                    processed_sentence = re.sub(r'<\|user\|>|<\|end\|>|<\|assistant\|>|[\*#`_]', '', normalized_sentence).lstrip()
                     print(f"Synthesizing sentence: '{processed_sentence}'")
                     sentence_audio = await run_in_threadpool(synthesize_sentence_sync, processed_sentence)
                     if sentence_audio:

@@ -95,4 +95,5 @@
     *   Resolved the `QuotaExceededError` in `script.js` by ensuring proper cleanup and re-initialization of `MediaSource` and `SourceBuffer` objects in the `AudioPlayer` class.
     *   Added explicit `audioPlayer.stop()` calls when new transcriptions are received to ensure a clean state for each new audio stream.
 
-**Result:** Lisa now offers enhanced voice customization for both Kitten and Kokoro TTS, and critical bugs related to LLM response repetition and audio playback stability have been resolved, leading to a more robust and user-friendly experience.
+*   **Filter LLM Prompt Tags from TTS Output:**
+    *   Removed unwanted LLM prompt tags (e.g., `<|user|>`, `<|end|>`, `<|assistant|>`) from the text sent to the TTS engine in `main.py` to ensure clean speech responses.
