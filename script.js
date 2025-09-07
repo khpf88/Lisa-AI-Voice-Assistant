@@ -144,7 +144,7 @@ class AudioPlayer {
         this.audio.removeEventListener('ended', this._onAudioEnded);
         this.audio.removeEventListener('error', this._onAudioError);
         this.audio.pause();
-        this.audio.removeAttribute('src'); // Detach MediaSource from audio element
+        this.audio.src = ''; // Detach MediaSource from audio element
         this.audio.load(); // Reset audio element
 
         this.sourceBuffer = null;

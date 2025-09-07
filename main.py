@@ -180,7 +180,7 @@ def route_prompt(prompt: str) -> str:
 
 async def summarize_text(app_state, text: str) -> str:
     """Summarizes a long text using a smaller LLM."""
-    summarization_prompt = f"Strictly summarize the following text in a conversational way, using no more than 50 words. Do not exceed this word count: {text}"
+    summarization_prompt = f"Summarize the following text concisely, providing enough information for an authentic and close conversational style. Ensure the summary is natural and flows well: {text}"
     selected_llm = app_state.llms["coding"] # Use the smaller model for summarization
     print("Summarizing long response...")
 

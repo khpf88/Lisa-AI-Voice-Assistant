@@ -117,3 +117,16 @@
     *   Resolved `setuptools` version conflict by explicitly adding `setuptools<80` to `requirements.txt`.
 
 **Outcome:** The TTS pipeline is now optimized for multi-core CPUs, and the application runs without the previously encountered serialization errors, leading to potentially smoother and faster speech output.
+
+## Session Update: LLM Summarization Logic Refinement
+
+**Date:** September 7, 2025
+
+**Summary:** The LLM summarization logic in `main.py` was refined to address truncation issues and improve the conversational quality of responses. The previous strict 50-word limit for summarization has been removed.
+
+**Key Changes:**
+
+*   The `summarization_prompt` in the `summarize_text` function in `main.py` was modified.
+*   The new prompt aims for concise summarization with enough information for an authentic and close conversational style, without a strict word count.
+
+**Outcome:** This change is expected to resolve truncation problems for larger LLM responses and enhance the natural flow of conversation.

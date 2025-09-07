@@ -27,7 +27,7 @@ This document outlines the product requirements for "Lisa," a web-based AI Voice
 
 *   **Language Model Integration:**
     *   **On-the-Fly Model Switching:** The application now uses different models based on the user's prompt. A smaller, faster model is used for general conversation, while a more capable model is used for tasks like coding. This optimizes performance and response quality.
-    *   **Intelligent Response Summarization:** If a response from the LLM is too long, the application uses a secondary, quick LLM call to summarize it into a more concise, conversational reply before sending it to the TTS engine. The summarization LLM now has an increased token limit and a stricter prompt to ensure more complete and concise summaries.
+    *   **Intelligent Response Summarization:** If a response from the LLM is too long, the application uses a secondary, quick LLM call to summarize it into a more concise, conversational reply before sending it to the TTS engine. The summarization LLM now has an increased token limit and a refined prompt to ensure concise, conversational, and authentic summaries.
     *   The application will receive text input from the STT engine and generate responses using a Large Language Model.
     *   It currently focuses on a **local, CPU-optimized LLM** (e.g., LiquidAI/lfm2 via `llama.cpp`). Cloud-based LLM integration (e.g., Google Gemini API) is currently commented out.
     *   LLM responses will be streamed, allowing for sentence-by-sentence TTS synthesis and playback to reduce perceived latency.
