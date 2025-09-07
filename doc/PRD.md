@@ -61,7 +61,7 @@ This document outlines the product requirements for "Lisa," a web-based AI Voice
 
 *   **Modularity:** The application should be designed in a modular way to allow for future expansion and easy maintenance.
 *   **Server-Centric Logic:** The client handles audio capture (using `AudioWorklet`) and playback, while the server manages VAD, STT, LLM, and TTS processing. This centralizes the core logic on the server for better control and performance on resource-constrained clients.
-*   **Asynchronous Processing:** All CPU-intensive tasks on the server (VAD, STT, LLM, TTS) are run in background threads to ensure the main network process is never blocked, maintaining a stable and responsive WebSocket connection.
+*   **Asynchronous Processing:** All CPU-intensive tasks on the server (VAD, STT, LLM, TTS) are run in background threads or separate processes. For TTS, the system uses a truly dynamic `ProcessPoolExecutor` that allocates workers based on a declarative resource profile. Each TTS engine declares its own RAM and CPU requirements, and the system calculates the optimal number of workers by comparing this profile against live system resources (available RAM, CPU cores). This prevents resource exhaustion with heavy models while maximizing performance for lightweight ones.
 *   **Streaming Pipeline:** Data flows in a continuous stream from microphone to STT, to LLM, to TTS, and back to audio output, minimizing buffering and disk I/O.
 
 ## 4. Future Enhancements

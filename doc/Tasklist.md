@@ -57,6 +57,8 @@
     *   [x] **Aggressive Sentence Splitting:** Implemented logic to start TTS synthesis on smaller text chunks (e.g., after commas) to reduce time-to-first-sound.
     *   [x] **Client-Side Buffering:** Increased the client-side audio buffer to mitigate choppiness caused by aggressive splitting.
     *   [x] **Implement RealtimeTTS:** (Now handled by external Kokoro FastAPI service. Further evaluation of smaller footprint TTS options is ongoing for alternative backends.)
+    *   [x] **TTS Multi-core Optimization:** Implemented `ProcessPoolExecutor` for parallel TTS synthesis.
+    *   [x] **Serialization Error Resolution:** Fixed `requires_grad` serialization issues when passing PyTorch tensors across process boundaries.
 
 ## Phase 5: Scalability and Flexibility (Completed)
 
@@ -81,6 +83,8 @@
 *   [x] **Fix LLM Conversation History:** Implement conversation history management to prevent the LLM from repeating previous responses.
 *   [x] **Fix Audio Player Quota Exceeded Error:** Resolve the `QuotaExceededError` in the client-side audio player by ensuring proper cleanup and re-initialization of MediaSource and SourceBuffer objects.
 *   [x] **Filter LLM Prompt Tags from TTS Output:** Remove unwanted LLM prompt tags (e.g., `<|user|>`, `<|end|>`) from the text sent to the TTS engine to ensure clean speech responses.
+*   [x] **Fix KittenTTS Crash:** Resolved an `AttributeError` during KittenTTS synthesis caused by an incorrect method call, ensuring stable audio generation.
+*   [x] **Implement Declarative Resource Management:** Refactored the TTS system to be fully agnostic. Each TTS engine class now declares its own resource profile (RAM and CPU requirements). The application reads this profile at startup and calculates the optimal number of worker processes based on live system resources, preventing memory exhaustion and maximizing performance.
 
 ## Phase 6: Future Enhancements (Planned)
 

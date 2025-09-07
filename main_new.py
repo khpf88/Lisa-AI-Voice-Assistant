@@ -24,7 +24,6 @@ import nltk
 import warnings
 import traceback
 from contextlib import asynccontextmanager
-from abc import ABC, abstractmethod
 import httpx
 from llama_cpp import Llama
 from faster_whisper import WhisperModel
@@ -88,17 +87,29 @@ async def lifespan(app: fastapi.FastAPI):
     app.state.model_info["llm"] = llm_model_name
     # print("LLM initialized.")
 
-    # --- TTS Configuration (models are loaded in worker processes) ---
     tts_engine_choice = os.getenv("TTS_ENGINE", "kokoro").lower().strip()
-    if tts_engine_choice not in ["kokoro", "kitten"]:
-        raise ValueError(f"Unknown TTS_ENGINE: {tts_engine_choice}. Choose 'kokoro' or 'kitten'.")
     app.state.tts_engine = tts_engine_choice
     app.state.model_info["tts"] = tts_engine_choice.capitalize()
-    app.state.kokoro_tts_voice = os.getenv("KOKORO_TTS_VOICE", "Bella")
-    app.state.kitten_tts_voice = os.getenv("KITTEN_TTS_VOICE", "expr-voice-2-f")
-    print(f"Selected TTS backend: {app.state.tts_engine}")
-    print(f" - Kokoro voice: {app.state.kokoro_tts_voice}")
-    print(f" - Kitten voice: {app.state.kitten_tts_voice}")
+    print(f"Selected TTS backend: {tts_engine_choice}")
+
+    # Read Kitten TTS voice if engine is kitten
+    if app.state.tts_engine == "kitten":
+        kitten_tts_voice = os.getenv("KITTEN_TTS_VOICE", "expr-voice-2-f") # Default to expr-voice-2-f
+        app.state.kitten_tts_voice = kitten_tts_voice
+        print(f"Selected Kitten TTS voice: {kitten_tts_voice}")
+
+    # --- TTS Engine Initialization ---
+    if app.state.tts_engine == "kokoro":
+        app.state.kokoro_tts = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
+        print("Kokoro TTS engine initialized.")
+        kokoro_tts_voice = os.getenv("KOKORO_TTS_VOICE", "Bella") # Default to Bella
+        app.state.kokoro_tts_voice = kokoro_tts_voice
+        print(f"Selected Kokoro TTS voice: {kokoro_tts_voice}")
+    elif app.state.tts_engine == "kitten":
+        app.state.kittentts_model = KittenTTS()
+        print("KittenTTS engine initialized.")
+    else:
+        raise ValueError(f"Unknown TTS_ENGINE: {app.state.tts_engine}. Choose 'kokoro' or 'kitten'.")
 
     stt_model_name = os.getenv("WHISPER_MODEL_NAME", "tiny.en") # Default to tiny.en
     app.state.whisper_model = WhisperModel(stt_model_name, device="cpu", compute_type="int8")
@@ -106,44 +117,8 @@ async def lifespan(app: fastapi.FastAPI):
     print("Faster Whisper STT model initialized.")
     print("--- All models loaded successfully ---")
 
-    # --- Initialize ProcessPoolExecutor with a declarative, resource-aware policy ---
-    engine_class = None
-    if app.state.tts_engine == "kokoro":
-        engine_class = KokoroEngine
-    elif app.state.tts_engine == "kitten":
-        engine_class = KittenEngine
-
-    if not engine_class:
-        raise ValueError(f"Could not find a profile for TTS engine: {app.state.tts_engine}")
-
-    # Read the declared requirements from the engine's profile.
-    est_ram_per_worker, max_cores_for_engine = engine_class.RESOURCE_PROFILE
-
-    # Get actual system resources.
-    cpu_cores_total = os.cpu_count() or 1
-    available_ram_gb = psutil.virtual_memory().available / (1024**3)
-
-    # --- Calculate optimal workers based on multiple constraints ---
-    # 1. Constraint by available RAM
-    # (Add a small 0.25GB buffer to be safe)
-    ram_workers = int((available_ram_gb - 0.25) // est_ram_per_worker)
-
-    # 2. Constraint by total CPU cores (default policy is half)
-    cpu_workers = cpu_cores_total // 2
-
-    # 3. The final number of workers is the minimum of all constraints.
-    tts_workers = max(1, min(ram_workers, cpu_workers, max_cores_for_engine))
-
-    print(f"INFO: Engine Profile ({app.state.tts_engine}): Needs ~{est_ram_per_worker}GB RAM, can use up to {max_cores_for_engine} cores.")
-    print(f"INFO: System State: {available_ram_gb:.2f}GB RAM available, {cpu_cores_total} CPU cores total.")
-    print(f"INFO: Calculated worker constraints: RAM limit={ram_workers}, CPU limit={cpu_workers}, Engine limit={max_cores_for_engine}.")
-    print(f"INFO: Final worker count set to {tts_workers}.")
-
-    app.state.tts_executor = ProcessPoolExecutor(
-        max_workers=tts_workers,
-        initializer=init_worker,
-        initargs=(app.state.tts_engine,)
-    )
+    # Initialize ProcessPoolExecutor for TTS synthesis
+    app.state.tts_executor = ProcessPoolExecutor(max_workers=2) # Use 2 cores for TTS synthesis
 
     nltk.download('punkt')
     yield
@@ -195,6 +170,7 @@ async def get_llm_response(app_state, text: str, history: list):
 def normalize_text(text):
     def decimal_to_words(match):
         number_str = match.group(0)
+
         if '.' in number_str:
             parts = number_str.split('.')
             integer_part_words = num2words(int(parts[0]))
@@ -205,112 +181,51 @@ def normalize_text(text):
     text = re.sub(r'\d+(\.\d+)?', decimal_to_words, text)
     return text
 
-# --- TTS Engine Abstraction ---
+# Global/static variable to hold the TTS model in each worker process
+_tts_model_cache = {}
 
-class TTSEngine(ABC):
-    """Abstract base class for a TTS engine."""
+def _perform_tts_synthesis_sync(
+    sentence_text: str,
+    tts_engine_choice: str,
+    voice: str # This is the voice parameter (e.g., "Bella", "expr-voice-2-f")
+) -> bytes:
+    all_pcm_audio = bytearray()
+    try:
+        # Initialize model if not already in cache for this process
+        if tts_engine_choice not in _tts_model_cache:
+            if tts_engine_choice == "kokoro":
+                _tts_model_cache[tts_engine_choice] = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
+            elif tts_engine_choice == "kitten":
+                _tts_model_cache[tts_engine_choice] = KittenTTS()
+            else:
+                raise ValueError(f"Unknown TTS_ENGINE: {tts_engine_choice}. Choose 'kokoro' or 'kitten'.")
 
-    # --- Resource Profile Declaration ---
-    # Each engine should override this profile to declare its requirements.
-    # Tuple format: (estimated_ram_gb_per_worker, max_cpu_cores_to_use)
-    RESOURCE_PROFILE = (1.0, 4) # A sensible default for a generic engine.
+        active_tts_model_instance = _tts_model_cache[tts_engine_choice]
 
-    @abstractmethod
-    def synthesize(self, text: str, voice: str) -> bytes:
-        """
-        Synthesizes text to raw PCM audio bytes (s16le, 24000Hz, mono).
-        Returns empty bytes if synthesis fails.
-        """
-        pass
-
-class KokoroEngine(TTSEngine):
-    """Wrapper for the memory-intensive Kokoro TTS engine."""
-    # Kokoro is heavy: Needs ~2GB RAM, shouldn't use more than 2 cores total to be safe.
-    RESOURCE_PROFILE = (2.0, 2)
-
-    def __init__(self):
-        print("Initializing Kokoro TTS engine in worker process...")
-        self.model = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
-        print("Kokoro TTS engine initialized.")
-
-    def synthesize(self, text: str, voice: str) -> bytes:
-        all_pcm_audio = bytearray()
-        try:
+        if tts_engine_choice == "kokoro":
             all_generated_audio_chunks = []
-            for i, (gs, ps, audio) in enumerate(self.model(text, voice=voice)):
+            for i, (gs, ps, audio) in enumerate(active_tts_model_instance(sentence_text, voice=voice)):
                 if audio is not None and audio.numel() > 0:
                     all_generated_audio_chunks.append(audio)
-
-            if not all_generated_audio_chunks:
-                print(f"Warning: Kokoro TTS produced no audio for text: '{text}' with voice: '{voice}'")
-                return b""
-
-            generated_audio = torch.cat(all_generated_audio_chunks)
-            if generated_audio is not None and isinstance(generated_audio, torch.Tensor):
-                audio_np = generated_audio.detach().cpu().numpy()
-                scaled_audio_np = (audio_np * 32767.0).astype(np.int16)
-                all_pcm_audio.extend(scaled_audio_np.tobytes())
-
-            return bytes(all_pcm_audio)
-        except Exception as e:
-            print(f"Error during Kokoro TTS synthesis: {e}")
-            traceback.print_exc()
-            return b""
-
-class KittenEngine(TTSEngine):
-    """Wrapper for the lightweight KittenTTS engine."""
-    # Kitten is light: Needs ~0.5GB RAM, can scale up to 8 cores if available.
-    RESOURCE_PROFILE = (0.5, 8)
-
-    def __init__(self):
-        print("Initializing KittenTTS engine in worker process...")
-        self.model = KittenTTS()
-        print("KittenTTS engine initialized.")
-
-    def synthesize(self, text: str, voice: str) -> bytes:
-        all_pcm_audio = bytearray()
-        try:
-            audio_np = self.model.generate(text, voice=voice)
+            if all_generated_audio_chunks:
+                generated_audio = torch.cat(all_generated_audio_chunks)
+            else:
+                generated_audio = None
+            if generated_audio is not None:
+                if isinstance(generated_audio, torch.Tensor):
+                    audio_np = generated_audio.detach().cpu().numpy()
+                    scaled_audio_np = (audio_np * 32767.0).astype(np.int16)
+                    all_pcm_audio.extend(scaled_audio_np.tobytes())
+        
+        elif tts_engine_choice == "kitten":
+            audio_np = active_tts_model_instance.generate(sentence_text, voice=voice)
+            audio_np = audio_np.detach() # Ensure it's detached
             scaled_audio_np = (audio_np * 32767.0).astype(np.int16)
             all_pcm_audio.extend(scaled_audio_np.tobytes())
-            return bytes(all_pcm_audio)
-        except Exception as e:
-            print(f"Error during KittenTTS synthesis: {e}")
-            traceback.print_exc()
-            return b""
-
-# --- Process Pool Worker Initialization ---
-
-# Global variable to hold the loaded TTS engine in a worker process
-_worker_tts_engine = None
-
-def init_worker(engine_choice: str):
-    """
-    Initializer for each worker process. Loads the specified TTS model.
-    This function runs once when a worker process is created.
-    """
-    global _worker_tts_engine
-    if _worker_tts_engine is None:
-        if engine_choice == "kokoro":
-            _worker_tts_engine = KokoroEngine()
-        elif engine_choice == "kitten":
-            _worker_tts_engine = KittenEngine()
-
-def _perform_tts_synthesis_sync(sentence_text: str, voice: str) -> bytes:
-    """
-    Uses the pre-loaded TTS engine in the worker to synthesize audio.
-    """
-    global _worker_tts_engine
-    try:
-        if _worker_tts_engine is None:
-            print("Error: TTS engine not initialized in worker. This should not happen.")
-            return b""
-
-        pcm_audio = _worker_tts_engine.synthesize(sentence_text, voice)
-        print(f"Synthesized audio size: {len(pcm_audio)} bytes")
-        return pcm_audio
+        print(f"Synthesized audio size: {len(all_pcm_audio)} bytes")
+        return bytes(all_pcm_audio)
     except Exception as e:
-        print(f"Fatal error in _perform_tts_synthesis_sync: {e}")
+        print(f"Error in _perform_tts_synthesis_sync: {e}")
         traceback.print_exc()
         return b""
 
@@ -355,6 +270,7 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 future = websocket.app.state.tts_executor.submit(
                     _perform_tts_synthesis_sync,
                     processed_sentence,
+                    websocket.app.state.tts_engine,
                     current_tts_voice
                 )
                 tts_futures.append(future)
@@ -375,6 +291,7 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 future = websocket.app.state.tts_executor.submit(
                     _perform_tts_synthesis_sync,
                     processed_sentence,
+                    websocket.app.state.tts_engine,
                     current_tts_voice
                 )
                 tts_futures.append(future)

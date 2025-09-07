@@ -83,7 +83,7 @@ This section outlines the high-level steps to evolve the Lisa application into a
 
 ### Step 1: Prove the Core Functionality (Achieved & Refined)
 
-The immediate goal of getting the core application working, including real-time two-way voice interaction, server-side VAD, streaming LLM responses, and multi-LLM provider support, has been largely achieved. The application is now containerized using Docker Compose, and the TTS functionality is provided by an external Dockerized service. The current focus is on optimizing performance and ensuring stability.
+The immediate goal of getting the core application working has been achieved and significantly refined. The system now features a robust, real-time, two-way voice pipeline with a declarative resource management system for its multi-engine TTS backend. This ensures stability and optimal performance by dynamically allocating resources based on both the selected engine's profile and live system stats. The application is also containerized via Docker Compose.
 
 ### Step 2: Refactor Lisa as a Dedicated Voice I/O Service
 
@@ -110,3 +110,32 @@ With the modular services defined, focus on deployment and scalability:
 *   **Deployment Strategy:** Define how these containers will be deployed (e.g., Kubernetes, Docker Compose).
 *   **Horizontal Scaling:** Implement strategies for running multiple instances of each service behind load balancers.
 *   **Asynchronous Communication:** Explore message queues for inter-service communication to improve reliability and performance.
+
+## End-to-End Workflow
+
+This diagram illustrates the step-by-step sequence of events for a typical user interaction, from speaking to hearing a response.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser (Client)
+    participant Lisa Server (FastAPI)
+    participant STT Engine (Whisper)
+    participant LLM (Llama.cpp)
+    participant TTS Worker Process
+
+    User->>+Browser (Client): Speaks
+    Browser (Client)->>+Lisa Server (FastAPI): Streams raw audio via WebSocket
+    Lisa Server (FastAPI)->>Lisa Server (FastAPI): Detects end of speech (VAD)
+    Lisa Server (FastAPI)->>+STT Engine (Whisper): Transcribe audio chunk
+    STT Engine (Whisper)-->>-Lisa Server (FastAPI): Returns transcribed text
+    Lisa Server (FastAPI)->>+LLM (Llama.cpp): Generate response for text
+    LLM (Llama.cpp)-->>-Lisa Server (FastAPI): Returns response text
+    Lisa Server (FastAPI)->>+TTS Worker Process: Synthesize sentence 1
+    TTS Worker Process-->>-Lisa Server (FastAPI): Returns audio data 1
+    Lisa Server (FastAPI)->>+TTS Worker Process: Synthesize sentence 2
+    TTS Worker Process-->>-Lisa Server (FastAPI): Returns audio data 2
+    Note over Lisa Server (FastAPI): Encodes audio data via FFmpeg
+    Lisa Server (FastAPI)->>-Browser (Client): Streams encoded audio via WebSocket
+    Browser (Client)->>-User: Plays audio through speakers
+```

@@ -97,3 +97,23 @@
 
 *   **Filter LLM Prompt Tags from TTS Output:**
     *   Removed unwanted LLM prompt tags (e.g., `<|user|>`, `<|end|>`, `<|assistant|>`) from the text sent to the TTS engine in `main.py` to ensure clean speech responses.
+
+## Session Update: TTS Multi-core Optimization & Serialization Fixes
+
+**Date:** September 6, 2025
+
+**Summary:** This session focused on implementing multi-core processing for Text-to-Speech (TTS) synthesis to improve playback smoothness and reduce latency, leveraging `ProcessPoolExecutor`. Significant challenges related to PyTorch tensor serialization across process boundaries were encountered and resolved.
+
+**Key Enhancements & Resolutions:**
+
+*   **TTS Multi-core Implementation:**
+    *   Refactored TTS synthesis to utilize `ProcessPoolExecutor` for parallel processing of sentences, aiming to leverage multiple CPU cores.
+    *   Confirmed that the system is now capable of using multiple cores for TTS synthesis.
+*   **PyTorch Tensor Serialization Fixes:**
+    *   Addressed `Cowardly refusing to serialize non-leaf tensor which requires_grad` errors.
+    *   Implemented `.detach()` calls on `torch.Tensor` outputs from both Kokoro and KittenTTS models before passing them across process boundaries.
+    *   Refactored `_perform_tts_synthesis_sync` to load TTS models within each worker process, preventing serialization issues with the model instances themselves.
+*   **Dependency Resolution:**
+    *   Resolved `setuptools` version conflict by explicitly adding `setuptools<80` to `requirements.txt`.
+
+**Outcome:** The TTS pipeline is now optimized for multi-core CPUs, and the application runs without the previously encountered serialization errors, leading to potentially smoother and faster speech output.
