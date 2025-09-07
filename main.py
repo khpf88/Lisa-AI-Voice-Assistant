@@ -180,14 +180,14 @@ def route_prompt(prompt: str) -> str:
 
 async def summarize_text(app_state, text: str) -> str:
     """Summarizes a long text using a smaller LLM."""
-    summarization_prompt = f"Summarize the following text in a conversational way, keeping it under 50 words: {text}"
+    summarization_prompt = f"Strictly summarize the following text in a conversational way, using no more than 50 words. Do not exceed this word count: {text}"
     selected_llm = app_state.llms["coding"] # Use the smaller model for summarization
     print("Summarizing long response...")
 
     llm_stream = await run_in_threadpool(
         selected_llm,
         prompt=summarization_prompt,
-        max_tokens=250,
+        max_tokens=500,
         temperature=0.5,
         stream=False # No streaming for summarization
     )
