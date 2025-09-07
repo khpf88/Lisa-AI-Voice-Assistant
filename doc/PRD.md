@@ -10,6 +10,7 @@ This document outlines the product requirements for "Lisa," a web-based AI Voice
 
 *   **Voice Input & Voice Activity Detection (VAD):**
     *   The application shall continuously listen for voice input from the user via the microphone.
+    *   **Dynamic VAD Thresholding:** The application now measures the ambient noise level of the user's environment and dynamically adjusts the VAD energy threshold. This results in more reliable speech detection in both quiet and noisy settings.
     *   **Server-side VAD shall be used to detect active speech.** The client will stream audio continuously to the server, which will perform VAD to identify utterances. Client-side audio capture now utilizes `AudioWorklet` for improved performance and modern browser compatibility. This approach is chosen for robustness and to centralize core logic on the server.
     *   The application shall not require explicit button presses for conversation initiation or continuation.
 *   **Speech-to-Text (STT):**
@@ -25,6 +26,8 @@ This document outlines the product requirements for "Lisa," a web-based AI Voice
     *   **Aggressive sentence splitting** is used to reduce perceived latency. The system synthesizes smaller chunks of text (e.g., after commas) as they arrive from the LLM. To counteract potential choppiness from this approach, the client-side maintains a larger audio buffer.
 
 *   **Language Model Integration:**
+    *   **On-the-Fly Model Switching:** The application now uses different models based on the user's prompt. A smaller, faster model is used for general conversation, while a more capable model is used for tasks like coding. This optimizes performance and response quality.
+    *   **Intelligent Response Summarization:** If a response from the LLM is too long, the application uses a secondary, quick LLM call to summarize it into a more concise, conversational reply before sending it to the TTS engine.
     *   The application will receive text input from the STT engine and generate responses using a Large Language Model.
     *   It currently focuses on a **local, CPU-optimized LLM** (e.g., LiquidAI/lfm2 via `llama.cpp`). Cloud-based LLM integration (e.g., Google Gemini API) is currently commented out.
     *   LLM responses will be streamed, allowing for sentence-by-sentence TTS synthesis and playback to reduce perceived latency.
@@ -61,7 +64,7 @@ This document outlines the product requirements for "Lisa," a web-based AI Voice
 
 *   **Modularity:** The application should be designed in a modular way to allow for future expansion and easy maintenance.
 *   **Server-Centric Logic:** The client handles audio capture (using `AudioWorklet`) and playback, while the server manages VAD, STT, LLM, and TTS processing. This centralizes the core logic on the server for better control and performance on resource-constrained clients.
-*   **Asynchronous Processing:** All CPU-intensive tasks on the server (VAD, STT, LLM, TTS) are run in background threads or separate processes. For TTS, the system uses a truly dynamic `ProcessPoolExecutor` that allocates workers based on a declarative resource profile. Each TTS engine declares its own RAM and CPU requirements, and the system calculates the optimal number of workers by comparing this profile against live system resources (available RAM, CPU cores). This prevents resource exhaustion with heavy models while maximizing performance for lightweight ones.
+*   **Asynchronous Processing:** All CPU-intensive tasks on the server (VAD, STT, LLM, TTS) are run in background threads or separate processes. For TTS, the system uses a truly dynamic `ProcessPoolExecutor` that allocates workers based on a declarative resource profile. Each TTS engine declares its own RAM and CPU requirements, and the system calculates the optimal number of workers by comparing this profile against live system resources (available RAM, CPU cores). This prevents resource exhaustion with heavy models while maximizing performance for lightweight ones. To further improve performance, if the calculated number of workers is 1, it is automatically increased to 2, ensuring a minimum of 2 cores are dedicated to TTS.
 *   **Streaming Pipeline:** Data flows in a continuous stream from microphone to STT, to LLM, to TTS, and back to audio output, minimizing buffering and disk I/O.
 
 ## 4. Future Enhancements

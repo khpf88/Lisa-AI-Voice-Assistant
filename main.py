@@ -81,12 +81,20 @@ async def lifespan(app: fastapi.FastAPI):
     print(f"System Specs: {app.state.system_specs}")
 
     # --- LLM Initialization ---
-    llm_model_name = os.getenv("LLM_MODEL_FILENAME", "tinyllama-1.1b-chat-v1.0.Q3_K_S.gguf")
-    llm_model_path = os.path.join(ROOT, "models", llm_model_name)
-    # print(f"Loading LLM from: {llm_model_path}")
-    app.state.llm = Llama(model_path=llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=False)
-    app.state.model_info["llm"] = llm_model_name
-    # print("LLM initialized.")
+    app.state.llms = {}
+    # General model for conversation
+    general_llm_model_name = os.getenv("GENERAL_LLM_MODEL_FILENAME", "tinyllama-1.1b-chat-v1.0.Q3_K_S.gguf")
+    general_llm_model_path = os.path.join(ROOT, "models", general_llm_model_name)
+    app.state.llms["general"] = Llama(model_path=general_llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=False)
+    print(f"Loaded general LLM: {general_llm_model_name}")
+
+    # Coding model for code-related prompts
+    coding_llm_model_name = os.getenv("CODING_LLM_MODEL_FILENAME", "qwen2-0_5b-instruct-q8_0.gguf")
+    coding_llm_model_path = os.path.join(ROOT, "models", coding_llm_model_name)
+    app.state.llms["coding"] = Llama(model_path=coding_llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=False)
+    print(f"Loaded coding LLM: {coding_llm_model_name}")
+
+    app.state.model_info["llm"] = f"General: {general_llm_model_name}, Coding: {coding_llm_model_name}"
 
     # --- TTS Configuration (models are loaded in worker processes) ---
     tts_engine_choice = os.getenv("TTS_ENGINE", "kokoro").lower().strip()
@@ -133,6 +141,8 @@ async def lifespan(app: fastapi.FastAPI):
 
     # 3. The final number of workers is the minimum of all constraints.
     tts_workers = max(1, min(ram_workers, cpu_workers, max_cores_for_engine))
+    if tts_workers == 1:
+        tts_workers = 2
 
     print(f"INFO: Engine Profile ({app.state.tts_engine}): Needs ~{est_ram_per_worker}GB RAM, can use up to {max_cores_for_engine} cores.")
     print(f"INFO: System State: {available_ram_gb:.2f}GB RAM available, {cpu_cores_total} CPU cores total.")
@@ -161,6 +171,30 @@ async def read_root():
     with open("index.html", "r") as f:
         return HTMLResponse(content=f.read())
 
+def route_prompt(prompt: str) -> str:
+    """Routes a prompt to the appropriate LLM."""
+    coding_keywords = ["code", "python", "javascript", "java", "c++", "rust", "go", "typescript"]
+    if any(keyword in prompt.lower() for keyword in coding_keywords):
+        return "coding"
+    return "general"
+
+async def summarize_text(app_state, text: str) -> str:
+    """Summarizes a long text using a smaller LLM."""
+    summarization_prompt = f"Summarize the following text in a conversational way, keeping it under 50 words: {text}"
+    selected_llm = app_state.llms["coding"] # Use the smaller model for summarization
+    print("Summarizing long response...")
+
+    llm_stream = await run_in_threadpool(
+        selected_llm,
+        prompt=summarization_prompt,
+        max_tokens=100,
+        temperature=0.5,
+        stream=False # No streaming for summarization
+    )
+
+    summary = llm_stream['choices'][0]['text'].strip()
+    return summary
+
 async def get_llm_response(app_state, text: str, history: list):
     full_prompt = ""
     for user_msg, assistant_resp in history:
@@ -173,9 +207,14 @@ async def get_llm_response(app_state, text: str, history: list):
 {text}<|end|>
 <|assistant|>'''
 
+    # Route the prompt to the appropriate LLM
+    model_choice = route_prompt(text)
+    selected_llm = app_state.llms[model_choice]
+    print(f"Routing prompt to '{model_choice}' LLM.")
+
     # Run the LLM inference in a background thread
     llm_stream = await run_in_threadpool(
-        app_state.llm,
+        selected_llm,
         prompt=full_prompt,
         max_tokens=150,
         temperature=0.7,
@@ -190,7 +229,13 @@ async def get_llm_response(app_state, text: str, history: list):
     for output in llm_stream:
         response_text += output['choices'][0]['text']
         
-    return response_text.strip()
+    response_text = response_text.strip()
+    summarized = False
+    if len(response_text) > 500:
+        response_text = await summarize_text(app_state, response_text)
+        summarized = True
+
+    return response_text, model_choice, summarized
 
 def normalize_text(text):
     def decimal_to_words(match):
@@ -446,6 +491,8 @@ async def websocket_endpoint(websocket: WebSocket):
         }
     })
 
+    await websocket.send_json({"type": "calibration_start"})
+
     vad = webrtcvad.Vad(1)
     VAD_SAMPLE_RATE = 16000
     VAD_FRAME_MS = 30
@@ -457,6 +504,14 @@ async def websocket_endpoint(websocket: WebSocket):
     silence_frames_count = 0
     SILENCE_THRESHOLD_MS = 750
     silence_threshold_frames = int(SILENCE_THRESHOLD_MS / VAD_FRAME_MS)
+
+    # Dynamic VAD Thresholding
+    is_calibrating = True
+    calibration_frames = 0
+    CALIBRATION_DURATION_MS = 2000  # 2 seconds
+    calibration_frame_count = int(CALIBRATION_DURATION_MS / VAD_FRAME_MS)
+    ambient_energy_values = []
+    ENERGY_THRESHOLD = 999  # Default value
 
     try:
         while True:
@@ -471,6 +526,23 @@ async def websocket_endpoint(websocket: WebSocket):
                 while len(vad_audio_buffer) >= VAD_FRAME_SAMPLES * 2:
                     frame_bytes = vad_audio_buffer[:VAD_FRAME_SAMPLES * 2]
                     del vad_audio_buffer[:VAD_FRAME_SAMPLES * 2]
+
+                    if is_calibrating:
+                        frame_int16 = np.frombuffer(frame_bytes, dtype=np.int16)
+                        rms_energy = np.sqrt(np.mean(frame_int16.astype(np.float64)**2))
+                        ambient_energy_values.append(rms_energy)
+                        calibration_frames += 1
+                        if calibration_frames >= calibration_frame_count:
+                            if ambient_energy_values:
+                                avg_ambient_energy = np.mean(ambient_energy_values)
+                                ENERGY_THRESHOLD = avg_ambient_energy * 5  # Set threshold to 5x ambient noise
+                                print(f"Ambient energy calculated: {avg_ambient_energy:.2f}. New energy threshold: {ENERGY_THRESHOLD:.2f}")
+                            else:
+                                print("No audio received during calibration. Using default energy threshold.")
+                            is_calibrating = False
+                            await websocket.send_json({"type": "calibration_complete"})
+                        continue
+
                     is_speech = vad.is_speech(frame_bytes, VAD_SAMPLE_RATE)
                     if is_speech:
                         if not is_speaking:
@@ -506,8 +578,11 @@ async def websocket_endpoint(websocket: WebSocket):
                                     if transcription and not transcription.lower().startswith(("[blank audio]", "[blank_audio]")):
                                         print(f"Final Transcription: '{transcription}'")
                                         await websocket.send_json({"type": "transcription", "text": transcription})
-                                        response_text = await get_llm_response(websocket.app.state, transcription, conversation_history)
+                                        response_text, model_choice, summarized = await get_llm_response(websocket.app.state, transcription, conversation_history)
                                         conversation_history.append((transcription, response_text))
+                                        await websocket.send_json({"type": "model_update", "model": model_choice})
+                                        if summarized:
+                                            await websocket.send_json({"type": "summarization_info"})
                                         asyncio.create_task(stream_tts_and_synthesize(websocket, response_text))
                                     else:
                                         print("Transcription was blank or discarded.")

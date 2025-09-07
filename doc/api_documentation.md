@@ -25,6 +25,22 @@ The primary interaction with Lisa is now exclusively through a WebSocket connect
 
 ### Outgoing Messages (from Server to Client):
 
+*   **`calibration_start`:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "calibration_start"}`
+    *   **Description:** Sent when the WebSocket connection is established to inform the client that the VAD is calibrating.
+*   **`calibration_complete`:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "calibration_complete"}`
+    *   **Description:** Sent when the VAD calibration is complete.
+*   **`model_update`:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "model_update", "model": "string"}`
+    *   **Description:** Sent before a response is streamed to inform the client which LLM is being used.
+*   **`summarization_info`:**
+    *   **Type:** `JSON`
+    *   **Content:** `{"type": "summarization_info"}`
+    *   **Description:** Sent when a response has been summarized.
 *   **`transcription`:**
     *   **Type:** `JSON`
     *   **Content:** `{"type": "transcription", "text": "string"}`

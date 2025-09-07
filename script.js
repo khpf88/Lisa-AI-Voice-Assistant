@@ -245,6 +245,23 @@ async function setupRealtimeCommunication() {
                         audioPlayer.initialBuffer = [];
                         audioPlayer.isInitialBufferSent = false;
                     }
+                } else if (message.type === 'calibration_start') {
+                    if(statusP) statusP.textContent = 'Calibrating...';
+                } else if (message.type === 'calibration_complete') {
+                    if(statusP) statusP.textContent = 'Listening for your voice...';
+                } else if (message.type === 'summarization_info') {
+                    const statusP = document.getElementById('status');
+                    if (statusP) {
+                        statusP.textContent += " (summarized)";
+                    }
+                } else if (message.type === 'model_update') {
+                    const modelInfoDiv = document.getElementById('model-info');
+                    if (modelInfoDiv) {
+                        // This is a bit of a hack, we should probably refactor this
+                        const currentText = modelInfoDiv.innerHTML;
+                        const newText = currentText.replace(/LLM: [^<]+/, `LLM: ${message.model}`);
+                        modelInfoDiv.innerHTML = newText;
+                    }
                 } else if (message.type === 'session_info') {
                     const { system_specs, model_info, accumulated_tokens } = message.data;
                     const specsInfo = document.getElementById('specs-info');

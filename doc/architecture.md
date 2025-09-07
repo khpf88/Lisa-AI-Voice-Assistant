@@ -83,7 +83,7 @@ This section outlines the high-level steps to evolve the Lisa application into a
 
 ### Step 1: Prove the Core Functionality (Achieved & Refined)
 
-The immediate goal of getting the core application working has been achieved and significantly refined. The system now features a robust, real-time, two-way voice pipeline with a declarative resource management system for its multi-engine TTS backend. This ensures stability and optimal performance by dynamically allocating resources based on both the selected engine's profile and live system stats. The application is also containerized via Docker Compose.
+The immediate goal of getting the core application working has been achieved and significantly refined. The system now features a robust, real-time, two-way voice pipeline with a declarative and dynamic resource management system for its multi-engine TTS backend. This ensures stability and optimal performance by dynamically allocating resources based on both the selected engine's profile and live system stats, with a minimum of two workers for the TTS engine. The application is also containerized via Docker Compose.
 
 ### Step 2: Refactor Lisa as a Dedicated Voice I/O Service
 
@@ -121,7 +121,10 @@ sequenceDiagram
     participant Browser (Client)
     participant Lisa Server (FastAPI)
     participant STT Engine (Whisper)
-    participant LLM (Llama.cpp)
+    participant Prompt Router
+    participant LLM (General)
+    participant LLM (Coding)
+    participant LLM (Summarizer)
     participant TTS Worker Process
 
     User->>+Browser (Client): Speaks
@@ -129,8 +132,20 @@ sequenceDiagram
     Lisa Server (FastAPI)->>Lisa Server (FastAPI): Detects end of speech (VAD)
     Lisa Server (FastAPI)->>+STT Engine (Whisper): Transcribe audio chunk
     STT Engine (Whisper)-->>-Lisa Server (FastAPI): Returns transcribed text
-    Lisa Server (FastAPI)->>+LLM (Llama.cpp): Generate response for text
-    LLM (Llama.cpp)-->>-Lisa Server (FastAPI): Returns response text
+    Lisa Server (FastAPI)->>+Prompt Router: Route prompt based on content
+    alt Prompt is for coding
+        Prompt Router-->>-Lisa Server (FastAPI): Selects Coding LLM
+        Lisa Server (FastAPI)->>+LLM (Coding): Generate response for text
+        LLM (Coding)-->>-Lisa Server (FastAPI): Returns response text
+    else General prompt
+        Prompt Router-->>-Lisa Server (FastAPI): Selects General LLM
+        Lisa Server (FastAPI)->>+LLM (General): Generate response for text
+        LLM (General)-->>-Lisa Server (FastAPI): Returns response text
+    end
+    alt Response is too long
+        Lisa Server (FastAPI)->>+LLM (Summarizer): Summarize response
+        LLM (Summararizer)-->>-Lisa Server (FastAPI): Returns summarized text
+    end
     Lisa Server (FastAPI)->>+TTS Worker Process: Synthesize sentence 1
     TTS Worker Process-->>-Lisa Server (FastAPI): Returns audio data 1
     Lisa Server (FastAPI)->>+TTS Worker Process: Synthesize sentence 2

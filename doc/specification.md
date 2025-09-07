@@ -44,7 +44,7 @@ Further investigation and fine-tuning of audio playback to eliminate perceived g
 
 ### VAD Sensitivity Tuning
 
-Adjusting client-side VAD parameters for optimal speech detection in various environments.
+Adjusting client-side VAD parameters for optimal speech detection in various environments. The application now features dynamic VAD thresholding, which automatically adjusts the energy threshold based on the ambient noise level of the user's environment. This results in more reliable speech detection in both quiet and noisy settings.
 
 ### Error Handling & Robustness
 
