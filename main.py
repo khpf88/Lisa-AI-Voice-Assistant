@@ -187,7 +187,7 @@ async def summarize_text(app_state, text: str) -> str:
     llm_stream = await run_in_threadpool(
         selected_llm,
         prompt=summarization_prompt,
-        max_tokens=100,
+        max_tokens=250,
         temperature=0.5,
         stream=False # No streaming for summarization
     )
