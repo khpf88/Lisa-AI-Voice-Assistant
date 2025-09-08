@@ -130,3 +130,22 @@
 *   The new prompt aims for concise summarization with enough information for an authentic and close conversational style, without a strict word count.
 
 **Outcome:** This change is expected to resolve truncation problems for larger LLM responses and enhance the natural flow of conversation.
+
+## Session Update: Iterative Refinement of LLM Summarization for Conciseness and Completeness
+
+**Date:** September 7, 2025
+
+**Summary:** This session involved multiple iterations to refine the LLM summarization process to achieve clear, concise, and untruncated responses with complete sentences, addressing user feedback on audio truncation.
+
+**Key Enhancements & Resolutions:**
+
+*   **Initial Summarization Prompt Refinement:**
+    *   The `summarization_prompt` in `main.py` was initially modified from a strict 50-word limit to aim for a more conversational style.
+*   **Aggressive `max_tokens` Reduction for Summarization LLM:**
+    *   The `max_tokens` parameter for the summarization LLM in `summarize_text` was progressively reduced from 500 to 100, and then to 50, in an attempt to force shorter summaries.
+*   **Implementation of Hard Character Limit:**
+    *   A hard character limit of 150 was introduced in `get_llm_response` to ensure the text sent to the TTS engine is always within a manageable length. This limit includes logic to attempt breaking at natural sentence or word boundaries to prevent mid-sentence truncation.
+*   **Final Summarization Prompt Adjustment for Completeness:**
+    *   The `summarization_prompt` was further refined to explicitly instruct the LLM to summarize in "a few complete sentences," emphasizing grammatical correctness and avoiding introductory phrases, to ensure the output is short, sweet, and untruncated.
+
+**Outcome:** The combination of a refined summarization prompt, reduced `max_tokens` for the summarization LLM, and a hard character limit with intelligent breaking logic has successfully resulted in concise, complete, and untruncated audio responses, meeting the user's requirements.

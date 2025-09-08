@@ -180,14 +180,14 @@ def route_prompt(prompt: str) -> str:
 
 async def summarize_text(app_state, text: str) -> str:
     """Summarizes a long text using a smaller LLM."""
-    summarization_prompt = f"Summarize the following text concisely, providing enough information for an authentic and close conversational style. Ensure the summary is natural and flows well: {text}"
+    summarization_prompt = f"Summarize the following text concisely in a few complete sentences. Ensure all sentences are grammatically correct and avoid any introductory phrases. The summary should be short and sweet: {text}"
     selected_llm = app_state.llms["coding"] # Use the smaller model for summarization
     print("Summarizing long response...")
 
     llm_stream = await run_in_threadpool(
         selected_llm,
         prompt=summarization_prompt,
-        max_tokens=500,
+        max_tokens=50,
         temperature=0.5,
         stream=False # No streaming for summarization
     )
@@ -232,8 +232,24 @@ async def get_llm_response(app_state, text: str, history: list):
     response_text = response_text.strip()
     summarized = False
     if len(response_text) > 500:
+        print(f"Original response length: {len(response_text)}")
         response_text = await summarize_text(app_state, response_text)
         summarized = True
+        print(f"Summarized response length: {len(response_text)}")
+        # Enforce hard character limit after summarization
+        HARD_LIMIT = 150
+        if len(response_text) > HARD_LIMIT:
+            response_text = response_text[:HARD_LIMIT]
+            # Optionally, try to end at a natural sentence break
+            last_period_index = response_text.rfind('.')
+            if last_period_index != -1:
+                response_text = response_text[:last_period_index + 1]
+            else:
+                # If no period, try to end at the last space to avoid cutting words
+                last_space_index = response_text.rfind(' ')
+                if last_space_index != -1:
+                    response_text = response_text[:last_space_index]
+            print(f"Hard-limited response length: {len(response_text)}")
 
     return response_text, model_choice, summarized
 
