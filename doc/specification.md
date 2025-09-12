@@ -3,7 +3,7 @@ The app should be developed using the latest web tech stack (HTML, CSS, JavaScri
 
 **Speech-to-Text (STT):** Faster Whisper will be used for local, CPU-optimized STT inference. Client-side VAD ensures that only active speech segments are sent for transcription.
 
-**Text-to-Speech (TTS):** Kokoro-TTS or KittenTTS will be used for Text-to-Speech, which are **local libraries**. It aims for natural expressiveness but does not natively support voice cloning or strong, specific emotional speech. TTS audio will be generated as a continuous stream in Opus format, allowing for both low initial latency and gapless playback.
+**Text-to-Speech (TTS):** The application supports multiple, selectable, local TTS engines. The default is `Kokoro`, but it can be configured to use `KittenTTS` or `Marvis`. TTS audio will be generated as a continuous stream in Opus format, allowing for both low initial latency and gapless playback.
 
 **Language Model (LLM):** The application currently focuses on **local, CPU-optimized LLMs** (e.g., TinyLlama or LiquidAI LFM). While multiple LLM providers (Google Gemini API, OpenAI, DeepSeek, Grok) can be integrated, they are currently disabled/commented out. LLM responses are streamed for low-latency TTS.
 
@@ -22,7 +22,7 @@ The current technology stack is highly portable and designed for flexible deploy
 
 *   **Cross-Platform Compatibility:** The backend (Python and FastAPI) is cross-platform and can run on various operating systems (Windows, Linux, macOS).
 *   **Self-Contained STT:** Faster Whisper is a Python library that manages its own model caching, simplifying deployment as it's not reliant on external executables once set up.
-*   **Local LLM/TTS:** The current focus on local LLMs and Kokoro-TTS means these components are independent of external cloud services, requiring only local resources.
+*   **Local LLM/TTS:** The current focus on local LLMs and a variety of local TTS engines means these components are independent of external cloud services, requiring only local resources.
 *   **Standard Frontend:** The HTML/CSS/JavaScript frontend runs in any modern web browser.
 *   **Containerization Readiness:** The architecture is well-suited for containerization (e.g., using Docker), which would further simplify deployment by bundling the application and all its dependencies into a single, portable unit.
 

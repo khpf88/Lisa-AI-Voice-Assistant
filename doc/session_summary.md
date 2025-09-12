@@ -66,6 +66,7 @@
 *   The `kokoro-tts` dependency has been removed from Lisa's `requirements.txt`.
 *   Lisa's `main.py` has been modified to make HTTP API calls to the `Kokoro FastAPI Wrapper` service for TTS synthesis.
 *   A `docker-compose.yml` file has been introduced to orchestrate both Lisa's container and the `Kokoro FastAPI Wrapper` container.
+
 *   The `Dockerfile` for Lisa has been cleaned up to remove the problematic `kokoro` import verification step.
 
 **Result:** The Lisa project's Docker build is now functional, and the TTS functionality is provided by the external Kokoro FastAPI service, allowing for a robust and maintainable setup.
@@ -149,3 +150,67 @@
     *   The `summarization_prompt` was further refined to explicitly instruct the LLM to summarize in "a few complete sentences," emphasizing grammatical correctness and avoiding introductory phrases, to ensure the output is short, sweet, and untruncated.
 
 **Outcome:** The combination of a refined summarization prompt, reduced `max_tokens` for the summarization LLM, and a hard character limit with intelligent breaking logic has successfully resulted in concise, complete, and untruncated audio responses, meeting the user's requirements.
+
+## Session Update: LLM Simplification and Marvis TTS Integration
+
+**Date:** September 8, 2025
+
+**Summary:** This session focused on resolving a persistent summarization bug, optimizing resource usage, and integrating a new TTS engine.
+
+**Key Enhancements & Resolutions:**
+
+*   **LLM Summarization Refactor:** The previous two-step summarization process, which was causing truncated output, was entirely removed. It was replaced with a more efficient single-prompt approach where a system prompt instructs the LLM to be concise from the outset.
+*   **Resource Optimization:** The application no longer loads the secondary 'coding' LLM at startup, reducing the application's memory footprint.
+*   **Marvis TTS Integration:** The powerful Marvis TTS engine was successfully integrated as a third, selectable engine option (`TTS_ENGINE=marvis`). This introduces advanced voice cloning capabilities to the project.
+*   **Documentation Update:** All relevant project documents (`PRD.md`, `architecture.md`, `api_documentation.md`, `Tasklist.md`) were updated to reflect these significant changes.
+
+## Session Update: Removal of Unstable TTS Engines
+
+**Date:** September 11, 2025
+
+**Summary:** This session focused on removing the `pyttsx3` and `piper-tts` engines to improve project stability.
+
+**Key Enhancements & Resolutions:**
+
+*   **`pyttsx3` Removal:** The `pyttsx3` engine was identified as a non-performant bottleneck and was removed from the project.
+*   **`piper-tts` Removal:** After a lengthy and unsuccessful debugging process, the `piper-tts` library was found to be unstable and its API unpredictable in the current environment. It has been completely removed from the project to ensure stability.
+*   **Code and Documentation Cleanup:** All code and documentation related to `pyttsx3` and `piper-tts` has been removed from the project.
+
+**Outcome:** The project is now in a more stable state, with only the reliable TTS engines (`Kokoro`, `KittenTTS`, `Marvis`) remaining. This simplifies the configuration and reduces maintenance overhead.
+
+## Session Update: LLM Response Handling
+
+**Date:** September 11, 2025
+
+**Summary:** This session focused on improving the robustness of the LLM response handling.
+
+**Key Enhancements & Resolutions:**
+
+*   **LLM Output Truncation:** Implemented logic to strictly parse the LLM's output and truncate it at the first occurrence of a stop token (e.g., `<|user|>`, `<|end|>`). This prevents the model from generating and speaking hallucinated conversational turns, which was identified as a critical bug.
+
+**Outcome:** The application is now more robust against common LLM generation errors and will produce cleaner, more predictable audio responses across all supported models.
+
+## Session Update: LLM and TTS Configuration
+
+**Date:** September 11, 2025
+
+**Summary:** This session focused on adding new configuration options for the LLM and TTS.
+
+**Key Enhancements & Resolutions:**
+
+*   **LLM Detail Level:** Implemented a new `LLM_DETAIL_LEVEL` environment variable to control the verbosity and detail of the LLM's responses. This dynamically adjusts the system prompt and `max_tokens` for the LLM.
+*   **TTS Tempo Control:** Implemented a new `TTS_TEMPO` environment variable to control the speaking rate of the TTS voice. This feature is currently only supported by the `Kokoro` TTS engine.
+
+**Outcome:** The application now offers more fine-grained control over the LLM's response style and the TTS speaking tempo, enhancing user customization.
+
+## Session Update: Fix for f-string SyntaxError
+
+**Date:** September 11, 2025
+
+**Summary:** This session addressed a recurring `SyntaxError` in `main.py` related to f-string formatting.
+
+**Key Enhancements & Resolutions:**
+
+*   **f-string Formatting:** The `get_llm_response` function was refactored to use triple-quoted f-strings for all multi-line string literals. This ensures correct parsing by the Python interpreter and resolves the `SyntaxError: unterminated f-string literal`.
+
+**Outcome:** The `main.py` file is now syntactically correct, eliminating the f-string related errors.

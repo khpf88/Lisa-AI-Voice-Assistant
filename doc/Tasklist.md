@@ -86,6 +86,15 @@
 *   [x] **Fix KittenTTS Crash:** Resolved an `AttributeError` during KittenTTS synthesis caused by an incorrect method call, ensuring stable audio generation.
 *   [x] **Implement Declarative Resource Management:** Refactored the TTS system to be fully agnostic. Each TTS engine class now declares its own resource profile (RAM and CPU requirements). The application reads this profile at startup and calculates the optimal number of worker processes based on live system resources, preventing memory exhaustion and maximizing performance.
 
+## Phase 5.6: LLM & TTS Refinements (September 2025)
+
+*   [x] **Refactor LLM Summarization:** Replaced the two-step summarization process with a single system prompt instructing the LLM to be concise, improving efficiency and resolving truncation issues.
+*   [x] **Optimize Resource Usage:** Removed the loading of the unused 'coding' LLM to reduce memory footprint.
+*   [x] **Integrate Marvis TTS:** Added Marvis TTS as a third, selectable TTS engine, introducing voice cloning capabilities.
+*   [x] **Update Project Documentation:** Updated PRD, architecture, API, and task list documents to reflect all recent changes.
+
+
+
 ## Phase 6: Future Enhancements (Planned)
 
 *   [ ] **Evaluate and Integrate New TTS Options:**

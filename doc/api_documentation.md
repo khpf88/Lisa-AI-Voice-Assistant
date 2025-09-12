@@ -37,10 +37,7 @@ The primary interaction with Lisa is now exclusively through a WebSocket connect
     *   **Type:** `JSON`
     *   **Content:** `{"type": "model_update", "model": "string"}`
     *   **Description:** Sent before a response is streamed to inform the client which LLM is being used.
-*   **`summarization_info`:**
-    *   **Type:** `JSON`
-    *   **Content:** `{"type": "summarization_info"}`
-    *   **Description:** Sent when a response has been summarized.
+
 *   **`transcription`:**
     *   **Type:** `JSON`
     *   **Content:** `{"type": "transcription", "text": "string"}`

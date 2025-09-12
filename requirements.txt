@@ -22,3 +22,4 @@ num2words
 kokoro-tts
 httpx
 setuptools<80
+tokenizers

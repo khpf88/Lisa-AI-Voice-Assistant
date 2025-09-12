@@ -38,7 +38,7 @@ graph TD
     *   **FastAPI Server (WebSocket):** Manages real-time audio and text streaming with the client.
     *   **STT Engine (Faster Whisper):** Transcribes incoming audio into text.
     *   **Mickey Orchestration Service:** Lisa sends transcribed text to Mickey and receives text for TTS from Mickey.
-    *   **TTS Engine:** Converts text responses into natural-sounding speech.
+    *   **TTS Engine:** Converts text responses into natural-sounding speech. The system supports multiple, selectable TTS engines (e.g., Kokoro, KittenTTS, Marvis-TTS) with different resource profiles.
     *   **Dedicated API Endpoints:** Exposes STT and TTS functionalities as separate REST endpoints for consumption by an Orchestration Service or other applications.
 
 ## Future Architecture (with Central Orchestration)

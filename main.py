@@ -1,4 +1,3 @@
-
 import os
 import platform
 
@@ -35,9 +34,12 @@ import numpy as np
 import soundfile as sf
 import re
 from num2words import num2words
+import tempfile
 
 import webrtcvad
 import psutil
+
+
 
 from dotenv import load_dotenv
 from kokoro import KPipeline
@@ -88,22 +90,21 @@ async def lifespan(app: fastapi.FastAPI):
     app.state.llms["general"] = Llama(model_path=general_llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=False)
     print(f"Loaded general LLM: {general_llm_model_name}")
 
-    # Coding model for code-related prompts
-    coding_llm_model_name = os.getenv("CODING_LLM_MODEL_FILENAME", "qwen2-0_5b-instruct-q8_0.gguf")
-    coding_llm_model_path = os.path.join(ROOT, "models", coding_llm_model_name)
-    app.state.llms["coding"] = Llama(model_path=coding_llm_model_path, n_ctx=2048, n_gpu_layers=-1, verbose=False)
-    print(f"Loaded coding LLM: {coding_llm_model_name}")
+    app.state.model_info["llm"] = general_llm_model_name
 
-    app.state.model_info["llm"] = f"General: {general_llm_model_name}, Coding: {coding_llm_model_name}"
+    # --- LLM Configuration ---
+    app.state.llm_detail_level = os.getenv("LLM_DETAIL_LEVEL", "medium").lower().strip()
+    print(f"LLM detail level set to: {app.state.llm_detail_level}")
 
     # --- TTS Configuration (models are loaded in worker processes) ---
     tts_engine_choice = os.getenv("TTS_ENGINE", "kokoro").lower().strip()
-    if tts_engine_choice not in ["kokoro", "kitten"]:
-        raise ValueError(f"Unknown TTS_ENGINE: {tts_engine_choice}. Choose 'kokoro' or 'kitten'.")
+    if tts_engine_choice not in ["kokoro", "kitten", "marvis"]:
+        raise ValueError(f"Unknown TTS_ENGINE: {tts_engine_choice}. Choose 'kokoro', 'kitten', or 'marvis'.")
     app.state.tts_engine = tts_engine_choice
     app.state.model_info["tts"] = tts_engine_choice.capitalize()
     app.state.kokoro_tts_voice = os.getenv("KOKORO_TTS_VOICE", "Bella")
     app.state.kitten_tts_voice = os.getenv("KITTEN_TTS_VOICE", "expr-voice-2-f")
+    app.state.tts_tempo = float(os.getenv("TTS_TEMPO", "1.0"))
     print(f"Selected TTS backend: {app.state.tts_engine}")
     print(f" - Kokoro voice: {app.state.kokoro_tts_voice}")
     print(f" - Kitten voice: {app.state.kitten_tts_voice}")
@@ -120,6 +121,8 @@ async def lifespan(app: fastapi.FastAPI):
         engine_class = KokoroEngine
     elif app.state.tts_engine == "kitten":
         engine_class = KittenEngine
+    elif app.state.tts_engine == "marvis":
+        engine_class = MarvisEngine
 
     if not engine_class:
         raise ValueError(f"Could not find a profile for TTS engine: {app.state.tts_engine}")
@@ -171,52 +174,58 @@ async def read_root():
     with open("index.html", "r") as f:
         return HTMLResponse(content=f.read())
 
-def route_prompt(prompt: str) -> str:
-    """Routes a prompt to the appropriate LLM."""
-    coding_keywords = ["code", "python", "javascript", "java", "c++", "rust", "go", "typescript"]
-    if any(keyword in prompt.lower() for keyword in coding_keywords):
-        return "coding"
-    return "general"
-
-async def summarize_text(app_state, text: str) -> str:
-    """Summarizes a long text using a smaller LLM."""
-    summarization_prompt = f"Summarize the following text concisely in a few complete sentences. Ensure all sentences are grammatically correct and avoid any introductory phrases. The summary should be short and sweet: {text}"
-    selected_llm = app_state.llms["coding"] # Use the smaller model for summarization
-    print("Summarizing long response...")
-
-    llm_stream = await run_in_threadpool(
-        selected_llm,
-        prompt=summarization_prompt,
-        max_tokens=50,
-        temperature=0.5,
-        stream=False # No streaming for summarization
-    )
-
-    summary = llm_stream['choices'][0]['text'].strip()
-    return summary
+# async def summarize_text(app_state, text: str) -> str:
+#     """Summarizes a long text using the general LLM."""
+#     summarization_prompt = f"Summarize the following text concisely: {text}"
+#     selected_llm = app_state.llms["general"] # Use the general model for summarization
+#     print("Summarizing long response...")
+# 
+#     llm_stream = await run_in_threadpool(
+#         selected_llm,
+#         prompt=summarization_prompt,
+#         max_tokens=512,
+#         temperature=0.5,
+#         stream=False # No streaming for summarization
+#     )
+# 
+#     summary = llm_stream['choices'][0]['text'].strip()
+#     return summary
 
 async def get_llm_response(app_state, text: str, history: list):
-    full_prompt = ""
+    # --- System Prompt and Parameter Configuration based on Detail Level ---
+    detail_level = app_state.llm_detail_level
+    if detail_level == "low":
+        system_prompt = "You are an extremely concise AI assistant. Your responses must be very brief, limited to a single short sentence."
+        max_tokens = 60
+    elif detail_level == "high":
+        system_prompt = "You are a helpful and detailed AI assistant. Your responses should be thorough and informative, but still conversational. Explain your reasoning clearly."
+        max_tokens = 200 # Changed from 300 to 200
+    else: # Medium (default)
+        system_prompt = "You are a friendly and concise AI assistant. Your responses should be brief, conversational, and limited to one or two sentences."
+        max_tokens = 150
+
+    full_prompt = f"""<|system|>
+{system_prompt}<|end|>
+"""
     for user_msg, assistant_resp in history:
-        full_prompt += f'''<|user|>
+        full_prompt += f"""<|user|>
 {user_msg}<|end|>
 <|assistant|>
 {assistant_resp}<|end|>
-'''
-    full_prompt += f'''<|user|>
+"""
+    full_prompt += f"""<|user|>
 {text}<|end|>
-<|assistant|>'''
+<|assistant|>"""
 
-    # Route the prompt to the appropriate LLM
-    model_choice = route_prompt(text)
-    selected_llm = app_state.llms[model_choice]
-    print(f"Routing prompt to '{model_choice}' LLM.")
+    # Always use the general LLM
+    selected_llm = app.state.llms["general"]
+    # print(f"Using general LLM.")
 
     # Run the LLM inference in a background thread
     llm_stream = await run_in_threadpool(
         selected_llm,
         prompt=full_prompt,
-        max_tokens=150,
+        max_tokens=max_tokens,
         temperature=0.7,
         top_p=0.95,
         top_k=40,
@@ -228,30 +237,24 @@ async def get_llm_response(app_state, text: str, history: list):
     response_text = ""
     for output in llm_stream:
         response_text += output['choices'][0]['text']
+
+    # --- Stop Token Truncation ---
+    stop_tokens = ["<|user|>", "<|end|>", "<|assistant|>"]
+    min_index = -1
+    for token in stop_tokens:
+        index = response_text.find(token)
+        if index != -1:
+            if min_index == -1 or index < min_index:
+                min_index = index
+    
+    if min_index != -1:
+        response_text = response_text[:min_index]
         
     response_text = response_text.strip()
-    summarized = False
-    if len(response_text) > 500:
-        print(f"Original response length: {len(response_text)}")
-        response_text = await summarize_text(app_state, response_text)
-        summarized = True
-        print(f"Summarized response length: {len(response_text)}")
-        # Enforce hard character limit after summarization
-        HARD_LIMIT = 150
-        if len(response_text) > HARD_LIMIT:
-            response_text = response_text[:HARD_LIMIT]
-            # Optionally, try to end at a natural sentence break
-            last_period_index = response_text.rfind('.')
-            if last_period_index != -1:
-                response_text = response_text[:last_period_index + 1]
-            else:
-                # If no period, try to end at the last space to avoid cutting words
-                last_space_index = response_text.rfind(' ')
-                if last_space_index != -1:
-                    response_text = response_text[:last_space_index]
-            print(f"Hard-limited response length: {len(response_text)}")
+    summarized = False # Summarization is now handled by the initial prompt
 
-    return response_text, model_choice, summarized
+    return response_text, summarized
+
 
 def normalize_text(text):
     def decimal_to_words(match):
@@ -277,7 +280,7 @@ class TTSEngine(ABC):
     RESOURCE_PROFILE = (1.0, 4) # A sensible default for a generic engine.
 
     @abstractmethod
-    def synthesize(self, text: str, voice: str) -> bytes:
+    def synthesize(self, text: str, voice: str, tempo: float) -> bytes:
         """
         Synthesizes text to raw PCM audio bytes (s16le, 24000Hz, mono).
         Returns empty bytes if synthesis fails.
@@ -294,11 +297,12 @@ class KokoroEngine(TTSEngine):
         self.model = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
         print("Kokoro TTS engine initialized.")
 
-    def synthesize(self, text: str, voice: str) -> bytes:
+    def synthesize(self, text: str, voice: str, tempo: float) -> bytes:
         all_pcm_audio = bytearray()
         try:
             all_generated_audio_chunks = []
-            for i, (gs, ps, audio) in enumerate(self.model(text, voice=voice)):
+            # Pass the tempo to the model via the 'speed' parameter
+            for i, (gs, ps, audio) in enumerate(self.model(text, voice=voice, speed=tempo)):
                 if audio is not None and audio.numel() > 0:
                     all_generated_audio_chunks.append(audio)
 
@@ -328,7 +332,8 @@ class KittenEngine(TTSEngine):
         self.model = KittenTTS()
         print("KittenTTS engine initialized.")
 
-    def synthesize(self, text: str, voice: str) -> bytes:
+    def synthesize(self, text: str, voice: str, tempo: float) -> bytes:
+        # KittenTTS does not support tempo control, so the 'tempo' parameter is ignored.
         all_pcm_audio = bytearray()
         try:
             audio_np = self.model.generate(text, voice=voice)
@@ -339,6 +344,50 @@ class KittenEngine(TTSEngine):
             print(f"Error during KittenTTS synthesis: {e}")
             traceback.print_exc()
             return b""
+
+class MarvisEngine(TTSEngine):
+    """Wrapper for the Marvis TTS engine."""
+    # Marvis 250M is larger than Kitten, smaller than Kokoro.
+    # Let's give it a moderate profile.
+    RESOURCE_PROFILE = (1.0, 4)
+
+    def __init__(self):
+        print("Initializing Marvis TTS engine in worker process...")
+        from transformers import AutoProcessor, CsmForConditionalGeneration
+        model_id = "Marvis-AI/marvis-tts-250m-v0.1-transformers"
+        cache_dir = os.path.join(ROOT, ".cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        self.processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir)
+        self.model = CsmForConditionalGeneration.from_pretrained(model_id, cache_dir=cache_dir)
+        print("Marvis TTS engine initialized.")
+
+    def synthesize(self, text: str, voice: str, tempo: float) -> bytes:
+        # Marvis-TTS does not support tempo control, so the 'tempo' parameter is ignored.
+        # Marvis uses a speaker ID in the text, e.g., "[0]Hello"
+        # We'll ignore the 'voice' parameter for now and use a default speaker.
+        # This can be enhanced later to support voice cloning from a file.
+        text_with_speaker = f"[{voice or 0}]{text}"
+        try:
+            inputs = self.processor(text_with_speaker, add_special_tokens=True, return_tensors="pt")
+            if "token_type_ids" in inputs:
+                del inputs["token_type_ids"]
+
+            # Generate audio tensor
+            audio_tensor = self.model.generate(**inputs, output_audio=True)
+            
+            # Convert to numpy array and then to s16le bytes
+            audio_np = audio_tensor[0].cpu().numpy()
+            scaled_audio_np = (audio_np * 32767.0).astype(np.int16)
+            return scaled_audio_np.tobytes()
+
+        except Exception as e:
+            print(f"Error during Marvis TTS synthesis: {e}")
+            traceback.print_exc()
+            return b""
+
+
+
+
 
 # --- Process Pool Worker Initialization ---
 
@@ -356,8 +405,10 @@ def init_worker(engine_choice: str):
             _worker_tts_engine = KokoroEngine()
         elif engine_choice == "kitten":
             _worker_tts_engine = KittenEngine()
+        elif engine_choice == "marvis":
+            _worker_tts_engine = MarvisEngine()
 
-def _perform_tts_synthesis_sync(sentence_text: str, voice: str) -> bytes:
+def _perform_tts_synthesis_sync(sentence_text: str, voice: str, tempo: float) -> bytes:
     """
     Uses the pre-loaded TTS engine in the worker to synthesize audio.
     """
@@ -367,7 +418,7 @@ def _perform_tts_synthesis_sync(sentence_text: str, voice: str) -> bytes:
             print("Error: TTS engine not initialized in worker. This should not happen.")
             return b""
 
-        pcm_audio = _worker_tts_engine.synthesize(sentence_text, voice)
+        pcm_audio = _worker_tts_engine.synthesize(sentence_text, voice, tempo)
         print(f"Synthesized audio size: {len(pcm_audio)} bytes")
         return pcm_audio
     except Exception as e:
@@ -387,7 +438,8 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
         try:
             sentence_buffer = ""
             processing_buffer = re.sub(r'(\d)\.(\d)', r'\1<DECIMAL>\2', text)
-            sentences = re.split(r'(?<=[.?!,])\s*', processing_buffer)
+            # Modified: Split only on sentence-ending punctuation (.?!) to allow TTS to handle internal pauses
+            sentences = re.split(r'(?<=[.?!])\s*', processing_buffer)
             
             tts_futures = []
             sentences_to_process = []
@@ -404,6 +456,8 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 sentence_with_decimals = sentence.replace('<DECIMAL>', '.')
                 normalized_sentence = normalize_text(sentence_with_decimals)
                 processed_sentence = re.sub(r'<\|user\|>|<\|end\|>|<\|assistant\|>|[\*#`_]', '', normalized_sentence).lstrip()
+                if not processed_sentence.endswith(('.', '?', '!')):
+                    processed_sentence += '.'
                 
                 # Determine which TTS model and voice to pass
                 current_tts_voice = None
@@ -416,7 +470,8 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 future = websocket.app.state.tts_executor.submit(
                     _perform_tts_synthesis_sync,
                     processed_sentence,
-                    current_tts_voice
+                    current_tts_voice,
+                    websocket.app.state.tts_tempo
                 )
                 tts_futures.append(future)
 
@@ -436,7 +491,8 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 future = websocket.app.state.tts_executor.submit(
                     _perform_tts_synthesis_sync,
                     processed_sentence,
-                    current_tts_voice
+                    current_tts_voice,
+                    websocket.app.state.tts_tempo
                 )
                 tts_futures.append(future)
 
@@ -446,6 +502,11 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
                 if sentence_audio:
                     if process.stdin and not process.stdin.is_closing():
                         process.stdin.write(sentence_audio)
+                        # Add a small pause after each sentence (e.g., 100ms of silence)
+                        # 24000 Hz sample rate, 16-bit (s16le), mono -> 2 bytes per sample
+                        silence_duration_ms = 100
+                        silence_bytes = b'\x00' * int(sample_rate * (silence_duration_ms / 1000.0) * 2)
+                        process.stdin.write(silence_bytes)
                         await process.stdin.drain()
                     else:
                         break
@@ -457,6 +518,7 @@ async def stream_tts_and_synthesize(websocket: WebSocket, text: str):
             if process.stdin and not process.stdin.is_closing():
                 print("Closing ffmpeg stdin.")
                 process.stdin.close()
+
 
     async def stream_to_client():
         while True:
@@ -562,7 +624,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     is_speech = vad.is_speech(frame_bytes, VAD_SAMPLE_RATE)
                     if is_speech:
                         if not is_speaking:
-                            print("Speech started.")
+                            # print("Speech started.")
                             is_speaking = True
                             speech_buffer = bytearray() # Clear buffer at the start of a new speech segment
                         speech_buffer.extend(frame_bytes)
@@ -570,14 +632,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     elif is_speaking:
                         silence_frames_count += 1
                         if silence_frames_count > silence_threshold_frames:
-                            print("Speech ended due to silence.")
+                            # print("Speech ended due to silence.")
                             is_speaking = False
                             if speech_buffer:
                                 speech_np_int16 = np.frombuffer(speech_buffer, dtype=np.int16)
                                 speech_buffer = bytearray() # Clear buffer after processing
                                 rms_energy = np.sqrt(np.mean(speech_np_int16.astype(np.float64)**2))
                                 ENERGY_THRESHOLD = 999
-                                print(f"Utterance RMS energy: {rms_energy:.2f}")
+                                # print(f"Utterance RMS energy: {rms_energy:.2f}")
                                 if rms_energy > ENERGY_THRESHOLD:
                                     speech_np_float32 = speech_np_int16.astype(np.float32) / 32768.0
                                     start_time = time.time()
@@ -594,16 +656,17 @@ async def websocket_endpoint(websocket: WebSocket):
                                     if transcription and not transcription.lower().startswith(("[blank audio]", "[blank_audio]")):
                                         print(f"Final Transcription: '{transcription}'")
                                         await websocket.send_json({"type": "transcription", "text": transcription})
-                                        response_text, model_choice, summarized = await get_llm_response(websocket.app.state, transcription, conversation_history)
+                                        response_text, summarized = await get_llm_response(websocket.app.state, transcription, conversation_history)
                                         conversation_history.append((transcription, response_text))
-                                        await websocket.send_json({"type": "model_update", "model": model_choice})
+                                        await websocket.send_json({"type": "model_update", "model": "general"})
                                         if summarized:
                                             await websocket.send_json({"type": "summarization_info"})
                                         asyncio.create_task(stream_tts_and_synthesize(websocket, response_text))
                                     else:
                                         print("Transcription was blank or discarded.")
                                 else:
-                                    print(f"Utterance discarded, energy below threshold.")
+                                    # print(f"Utterance discarded, energy below threshold.")
+                                    pass
     except WebSocketDisconnect:
         print("WebSocket disconnected.")
     except Exception as e:
